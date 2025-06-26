@@ -14,27 +14,42 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+###########################################################################################################################################################
+
 # This is a prototype version for the PowerShell version of the Linux program Top, currently this has a varied number of bugs and almost no functionality.
 # However, it does still work, even if on the most basic of levels and will provide the user with a baseline of information such as PID, Process Name, 
 # CPU%, Memory usage, NPM, and start time. As time goes on I will continue to work on this script, hopefully building on it in such a manner that it can
 # be adequately used across servers through use of cmdlets such as Invoke-Command.
 
+###########################################################################################################################################################
+
+# Author: Rich Smith (Islc12)
+# Date Started: 26JUN2025
+
+###########################################################################################################################################################
+
+# Used to provide a more seamless enviroment, keeps the program from starting where ever it wants to on the shell
 [Console]::CursorVisible = $false
 $rawUI = $Host.UI.RawUI
 $initialBufferSize = $rawUI.BufferSize
 $rawUI.BufferSize = @{ Width = $initialBufferSize.Width; Height = 1000 }
 
+# Used to clear the terminal screen, avoiding any unintentional overlap in screen output
+Clear-Host
+Write-Host "Terminal Task Manager" -BackgroundColor DarkGrey -ForegroundColor Yellow
+
 try {
     while ($true) {
         $cpuStats = Get-Counter '\Process(*)\% Processor Time'
         $totalMemory = (Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory
+        $validSamples = $cpuStats.CounterSamples | Where-Object { $_.Status -eq 0 }
 
         $procInfo = @{}
         Get-Process | ForEach-Object {
             $procInfo[$_.Name.ToLower()] = $_
         }
 
-        $stats = $cpuStats.CounterSamples |
+        $stats = $validSamples |
             Where-Object { $_.InstanceName -notmatch 'Idle|_Total|System' } |
             Group-Object InstanceName |
             ForEach-Object {
@@ -60,10 +75,10 @@ try {
                     [System.Math]::Round(($workingSet / $totalMemory) * 100, 2)
                 } else { "-" }
 
-                $nameFixed = if ($rawName.Length -gt 45) {
-                    $rawName.Substring(0, 45)
+                $nameFixed = if ($rawName.Length -gt 40) {
+                    $rawName.Substring(0, 40)
                 } else {
-                    $rawName.PadRight(45)
+                    $rawName.PadRight(40)
                 }
 
                 [PSCustomObject]@{
@@ -82,15 +97,15 @@ try {
         # Move cursor to top-left without clearing screen
         $rawUI.CursorPosition = @{X=0;Y=0}
 
-        $output = $stats | Format-Table -Property @{Label="ID";Expression={$_.ID};Width=6},
-                                                @{Label="Name";Expression={$_.Name};Width=45},
-                                                @{Label="CPU%";Expression={$_.CPUPercent};Width=7},
-                                                @{Label="Memory(MB)";Expression={$_.MemoryMB};Width=10},
-                                                @{Label="Mem%";Expression={$_.MemPercent};Width=4},
-                                                @{Label="NPM(KB)";Expression={$_.NPM};Width=7},
-                                                @{Label="Start Time";Expression={$_.StartTime};Width=15} | Out-String
+        $output = $stats | Format-Table -Property @{Label="ID    ";Expression={$_.ID};Width=8;Alignment='Left'},
+                                                @{Label="Name                    ";Expression={$_.Name};Width=40},
+                                                @{Label="CPU%";Expression={$_.CPUPercent};Width=9},
+                                                @{Label="Memory(MB)";Expression={$_.MemoryMB};Width=12},
+                                                @{Label="Mem%";Expression={$_.MemPercent};Width=6},
+                                                @{Label="NPM(KB)";Expression={$_.NPM};Width=9},
+                                                @{Label="Start Time     ";Expression={$_.StartTime};Width=15;Alignment='Right'} | Out-String
 
-        Write-Output $output
+        Write-Host $output -BackgroundColor DarkGray -ForegroundColor Yellow
 
         Start-Sleep -Seconds 5
     }
@@ -98,5 +113,4 @@ try {
 
 finally {
     [Console]::CursorVisible = $true
-
 }
