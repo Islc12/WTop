@@ -36,7 +36,7 @@ $rawUI.BufferSize = @{ Width = $initialBufferSize.Width; Height = 1000 }
 
 # Used to clear the terminal screen, avoiding any unintentional overlap in screen output
 Clear-Host
-Write-Host "Terminal Task Manager" -BackgroundColor DarkGrey -ForegroundColor Yellow
+Write-Host "Terminal Task Manager" -BackgroundColor DarkGray -ForegroundColor Yellow
 
 try {
     while ($true) {
