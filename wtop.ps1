@@ -32,11 +32,27 @@
 [Console]::CursorVisible = $false
 $rawUI = $Host.UI.RawUI
 $initialBufferSize = $rawUI.BufferSize
-$rawUI.BufferSize = @{ Width = $initialBufferSize.Width; Height = 1000 }
+$rawUI.BufferSize = @{ Width = $initialBufferSize.Width; Height = 1200 }
 
 # Used to clear the terminal screen, avoiding any unintentional overlap in screen output
 Clear-Host
-Write-Host "Terminal Task Manager" -BackgroundColor DarkGray -ForegroundColor Yellow
+function Center-Text {
+    param (
+        [string]$Text,
+        [int]$Width
+    )
+    $padLeft = [math]::Max(0, [math]::Floor(($Width - $Text.Length) / 2))
+    $padRight = [math]::Max(0, $Width - $Text.Length - $padLeft)
+    return (' ' * $padLeft) + $Text + (' ' * $padRight)
+}
+
+# Example usage:
+$header = Center-Text -Text "Wtop - PowerShell Terminal Task Manager" -Width 115
+$instructions = Center-Text -Text "Press Ctrl+C to exit" -Width 115
+$separator = '-' * 115
+Write-Host $header -BackgroundColor DarkGray -ForegroundColor Yellow
+Write-Host $instructions -BackgroundColor DarkGray -ForegroundColor Yellow
+Write-Host $separator -BackgroundColor DarkGray -ForegroundColor Yellow
 
 try {
     while ($true) {
@@ -75,10 +91,10 @@ try {
                     [System.Math]::Round(($workingSet / $totalMemory) * 100, 2)
                 } else { "-" }
 
-                $nameFixed = if ($rawName.Length -gt 40) {
-                    $rawName.Substring(0, 40)
+                $nameFixed = if ($rawName.Length -gt 50) {
+                    $rawName.Substring(0, 50)
                 } else {
-                    $rawName.PadRight(40)
+                    $rawName.PadRight(50)
                 }
 
                 [PSCustomObject]@{
@@ -92,13 +108,15 @@ try {
                 }
             } |
             Sort-Object CPUPercent -Descending |
-            Select-Object -First 25
+            Select-Object -First 35
 
         # Move cursor to top-left without clearing screen
         $rawUI.CursorPosition = @{X=0;Y=0}
+        Write-Host ""
+        Write-Host ""
 
         $output = $stats | Format-Table -Property @{Label="ID    ";Expression={$_.ID};Width=8;Alignment='Left'},
-                                                @{Label="Name                    ";Expression={$_.Name};Width=40},
+                                                @{Label="Name                    ";Expression={$_.Name};Width=50},
                                                 @{Label="CPU%";Expression={$_.CPUPercent};Width=9},
                                                 @{Label="Memory(MB)";Expression={$_.MemoryMB};Width=12},
                                                 @{Label="Mem%";Expression={$_.MemPercent};Width=6},
