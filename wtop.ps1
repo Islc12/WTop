@@ -1,4 +1,4 @@
-# WTop - a Top like script for PowerShell
+# WTop - a process and resource usage script for PowerShell
 # Copyright (C) 2025 Richard Smith (Islc12)
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,18 +16,73 @@
 
 ###########################################################################################################################################################
 
-# This is a prototype version for the PowerShell version of the Linux program Top, except in PowerShell script form. The intended purpose is for a system
-# administrator, or other relevant individual, to be able to monitor important system processes and the resources that they utilize though a PowerShell 
-# interface. The best way to run this is to simply Invoke-Command on a remote device. This allows the user to keep the script itself local and not have to
-# add a separate program to n number of devices. Something that be especially important for space restricted remote systems. Currently this has a varied 
-# number of bugs and almost no functionality outside of the bare basics. However, it does still work, even if on the most basic of levels and will provide
-# the user with a baseline of information such as PID, Process Name, CPU%, Memory usage, NPM, and start time. As time goes on I will continue to work on
-# this script, hopefully building on it in such a manner that it can be adequately used across servers and other remote systems.
+<# 
+.SYNOPSIS
+    WTop is a script used to gather a collection of the top processes and their resource usage on a machine.
 
-###########################################################################################################################################################
+.DESCRIPTION
+    This is a prototype version for the PowerShell version of the Linux program Top, except in PowerShell script form. The intended purpose is for a system
+    administrator, or other relevant individual, to be able to monitor important system processes and the resources that they utilize though a PowerShell 
+    interface. The best way to run this is to simply Invoke-Command on a remote device. This allows the user to keep the script itself local and not have to
+    add a separate program to n number of devices. Something that be especially important for space restricted remote systems. Currently this has a varied 
+    number of bugs and almost no functionality outside of the bare basics. However, it does still work, even if on the most basic of levels and will provide
+    the user with a baseline of information such as PID, Process Name, CPU%, Memory usage, NPM, and start time. As time goes on I will continue to work on
+    this script, hopefully building on it in such a manner that it can be adequately used across servers and other remote systems.
 
-# Author: Rich Smith (Islc12)
-# Date Started: 26JUN2025
+.PARAMETER WaitTime
+    Specifies the wait time between updates in seconds. Defaults to 5 seconds.
+
+.PARAMETER PriorityStat
+    Specifies the priority statistic to sort by. Options are "CPU", "Memory", or "NPM". Defaults to "CPU".
+
+.PARAMETER NumberProcesses
+    Specifies the number of processes to display. Defaults to 20. Maximum is 35.
+
+.EXAMPLE
+    .\wtop.ps1
+    Runs the script with default parameters: 5-second update interval, prioritizing CPU usage, and displaying the top 20 processes.
+    This  is the default behavior if no parameters are provided.
+
+.EXAMPLE
+    .\wtop.ps1 -WaitTime 2
+    Runs the script with a 2-second update interval, prioritizing CPU usage, and displaying the top 20 processes.
+
+.EXAMPLE
+    .\wtop.ps1 -PriorityStat Memory
+    Runs the script with a 5-second update interval, prioritizing memory usage, and displaying the top 20 processes.
+
+.EXAMPLE
+    .\wtop.ps1 -NumberProcesses 10
+    Runs the script with a 5-second update interval, prioritizing CPU usage, and displaying the top 10 processes.
+
+.EXAMPLE
+    .\wtop.ps1 -WaitTime 3 -PriorityStat NPM
+    Runs the script with a 3-second update interval, prioritizing non-paged memory usage, and displaying the top 20 processes.
+
+.EXAMPLE
+    .\wtop.ps1 -WaitTime 1 -NumberProcesses 5
+    Runs the script with a 1-second update interval, prioritizing CPU usage, and displaying the top 5 processes.
+
+.EXAMPLE
+    .\wtop.ps1 -PriorityStat CPU -NumberProcesses 30
+    Runs the script with a 5-second update interval, prioritizing CPU usage, and displaying the top 30 processes.
+
+.EXAMPLE
+    .\wtop.ps1 -WaitTime 10 -PriorityStat Memory -NumberProcesses 15
+    Runs the script with a 10-second update interval, prioritizing memory usage, and displaying the top 15 processes.
+
+.EXAMPLE
+    Invoke-Command -ComputerName "RemoteServer" -FilePath "C:\Path\To\wtop.ps1" -ArgumentList 5, "CPU", 20
+    Executes the script on a remote server with a 5-second update interval, prioritizing CPU usage, and displaying the top 20 processes.
+    This is useful for monitoring processes on remote machines without needing to install additional software.
+    Ensure that PowerShell remoting is enabled and properly configured on the target machine.
+
+.NOTES
+    Version: 0.1 (Prototype)
+    Author: Rich Smith (Islc12)
+    Date: 26JUN2025
+    License: GNU General Public License v3.0
+#>
 
 ###########################################################################################################################################################
 
@@ -36,7 +91,7 @@ param(
     [Int32]$WaitTime=5,
     [ValidateSet("CPU","Memory","NPM")][string]$PriorityStat="CPU",
     [Int32]$NumberProcesses=20
-    )
+)
 
 # Stops the program before it starts if the user inputs too many processes to display, as this causes display issues.
 # Eventually I will add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
