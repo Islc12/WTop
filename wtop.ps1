@@ -112,7 +112,7 @@ $rawUI.BufferSize = @{ Width = $initialBufferSize.Width; Height = 1000 }
 Clear-Host
 
 # Function to center text within a given width
-function Center-Text {
+function Format-CenteredText {
     param (
         [string]$Text,
         [int]$Width
@@ -124,9 +124,9 @@ function Center-Text {
 
 $spelling = if ($WaitTime -eq 1) { "second" } else { "seconds" }
 # Create and display program header + instruction
-$header = Center-Text -Text "Wtop - PowerShell Terminal Process Viewer" -Width 115
-$instructions = Center-Text -Text "Press Ctrl+C to exit" -Width 115
-$details = Center-Text -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width 115
+$header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width 115
+$instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width 115
+$details = Format-CenteredText -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width 115
 $separator = '-' * 115
 Write-Host $header -BackgroundColor DarkGray -ForegroundColor Yellow
 Write-Host $instructions -BackgroundColor DarkGray -ForegroundColor Yellow
