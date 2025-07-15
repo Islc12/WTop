@@ -21,7 +21,7 @@
     WTop is a script used to gather a collection of the top processes and their resource usage on a machine.
 
 .DESCRIPTION
-    This is a prototype version for the PowerShell version of the Linux program Top, except in PowerShell script form. The intended purpose is for a system administrator, or other relevant individual, to be able to monitor important system processes and the resources that they utilize though a PowerShell interface. The best way to run this is to simply Invoke-Command on a remote device. This allows the user to keep the script itself local and not have to add a separate program to n number of devices. Something that be especially important for space restricted remote systems. Currently this has a varied number of bugs and almost no functionality outside of the bare basics. However, it does still work, even if on the most basic of levels and will provide the user with a baseline of information such as PID, Process Name, CPU%, Memory usage, NPM, and start time. As time goes on I will continue to work on this script, hopefully building on it in such a manner that it can be adequately used across servers and other remote systems.
+    This is a prototype version of a process resource usage monitor written explicitly for PowerShell. The intended purpose is for a system administrator, or other relevant individual, to be able to monitor important system processes and the resources that they utilize though a PowerShell interface. The best way to run this is to simply Invoke-Command on a remote device. This allows the user to keep the script itself local and not have to add a separate program to n number of devices. Something that be especially important for space restricted remote systems. Currently this has a varied number of bugs and almost no functionality outside of the bare basics. However, it does still work, even if on the most basic of levels and will provide the user with a baseline of information such as PID, Process Name, CPU%, Memory usage, NPM, and start time. As time goes on I will continue to work on this script, hopefully building on it in such a manner that it can be adequately used across servers and other remote systems.
 
 .PARAMETER WaitTime
     Specifies the wait time between updates in seconds. Defaults to 5 seconds.
@@ -82,6 +82,14 @@ Version: 0.1 (Prototype)
 Author: Rich Smith (Islc12)
 Date: 26JUN2025
 License: GNU General Public License v3.0
+
+Exit Codes:
+    0   - Successful execution and exit
+    20  - User input error (e.g., WaitTime less than 1 second)
+    21  - User input warning (e.g., WaitTime greater than 60 seconds)
+    30  - User input error (e.g., Invalid PriorityStat value)
+    40  - User input error (e.g., NumberProcesses exceeds maximum allowed)
+    99  - Unexpected error occurred during execution
 #>
 
 ###########################################################################################################################################################
@@ -89,51 +97,77 @@ License: GNU General Public License v3.0
 # Allows the user to specify a wait time between updates, defaults to 5 seconds if no value is provided
 param(
     [Int32]$WaitTime=5,
-    [ValidateSet("CPU","Memory","NPM")][string]$PriorityStat="CPU",
+    [string]$PriorityStat="CPU",
     [Int32]$NumberProcesses=20
 )
 
-# Stops the program before it starts if the user inputs too many processes to display, as this causes display issues.
-# Eventually I will add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
-if ($NumberProcesses -gt 35) {
-    Write-Warning "NumberProcesses greater than 35 causes display issues. TERMINATING PROGRAM."
-    break
-}
-
-# Used to provide a more seamless enviroment, keeps the program from starting where ever it wants to on the shell
-[Console]::CursorVisible = $false
 $rawUI = $Host.UI.RawUI
+$initialCursorPosition = $rawUI.CursorPosition
+$initialWindowTitle = $rawUI.WindowTitle
 $initialBufferSize = $rawUI.BufferSize
-$rawUI.BufferSize = @{ Width = $initialBufferSize.Width; Height = 1000 }
-
-# Used to clear the terminal screen, avoiding any unintentional overlap in screen output
-# In the future I will change this to not clear the screen, but rather to start the output at the top of the screen
-# This will allow for a user to scroll up and see previous output if needed
-Clear-Host
-
-# Function to center text within a given width
-function Format-CenteredText {
-    param (
-        [string]$Text,
-        [int]$Width
-    )
-    $padLeft = [math]::Max(0, [math]::Floor(($Width - $Text.Length) / 2))
-    $padRight = [math]::Max(0, $Width - $Text.Length - $padLeft)
-    return (' ' * $padLeft) + $Text + (' ' * $padRight)
-}
-
-$spelling = if ($WaitTime -eq 1) { "second" } else { "seconds" }
-# Create and display program header + instruction
-$header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width 115
-$instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width 115
-$details = Format-CenteredText -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width 115
-$separator = '-' * 115
-Write-Host $header -BackgroundColor DarkGray -ForegroundColor Yellow
-Write-Host $instructions -BackgroundColor DarkGray -ForegroundColor Yellow
-Write-Host $details -BackgroundColor DarkGray -ForegroundColor Yellow
-Write-Host $separator -BackgroundColor DarkGray -ForegroundColor Yellow
+$initialBackgroundColor = $rawUI.BackgroundColor
+$windowHeight = $rawUI.WindowSize.Height
+$exitCode = $null
 
 try {
+    # Used to provide a more seamless enviroment, keeps the program from starting where ever it wants to on the shell
+    [Console]::CursorVisible = $false
+    $rawUI.BufferSize = @{ Width = $initialBufferSize.Width; Height = $initialBufferSize.Height }
+    $rawUI.WindowTitle = "WTop - PowerShell Process Viewer"
+
+    # Manual validation for WaitTime parameter with custom exit codes
+    if ($WaitTime -lt 1) {
+        Write-Warning "WaitTime must be at least 1 second."
+        $exitCode = 20
+        break
+    } elseif ($WaitTime -gt 60) {
+        Write-Warning "WaitTime greater than 60 seconds is not recommended."
+        $exitCode = 21
+        break
+    }
+
+    # Manual validation for PriorityStat parameter with custom exit code
+    if ($PriorityStat -notin @("CPU","Memory","NPM")) {
+        Write-Warning "PriorityStat must be 'CPU', 'Memory', or 'NPM'."
+        $exitCode = 30
+        break
+    }
+
+    # Stops the program before it starts if the user inputs too many processes to display, as this causes display issues.
+    # Eventually I will add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
+    if ($NumberProcesses -gt ($windowHeight - 9)) {
+        Write-Warning "NumberProcesses greater than $($windowHeight - 9) causes display issues. Enlarge window or reduce number of processes."
+        $exitCode = 40
+        break
+    }
+
+    # Used to clear the terminal screen, avoiding any unintentional overlap in screen output
+    # In the future I will change this to not clear the screen, but rather to start the output at the top of the screen
+    # This will allow for a user to scroll up and see previous output if needed
+    Clear-Host
+
+    # Function to center text within a given width
+    function Format-CenteredText {
+        param (
+            [string]$Text,
+            [int]$Width
+        )
+        $padLeft = [math]::Max(0, [math]::Floor(($Width - $Text.Length) / 2))
+        $padRight = [math]::Max(0, $Width - $Text.Length - $padLeft)
+        return (' ' * $padLeft) + $Text + (' ' * $padRight)
+    }
+
+    $spelling = if ($WaitTime -eq 1) { "second" } else { "seconds" }
+    # Create and display program header + instruction
+    $header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width 115
+    $instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width 115
+    $details = Format-CenteredText -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width 115
+    $separator = '-' * 115
+    Write-Host $header -BackgroundColor DarkGray -ForegroundColor Yellow
+    Write-Host $instructions -BackgroundColor DarkGray -ForegroundColor Yellow
+    Write-Host $details -BackgroundColor DarkGray -ForegroundColor Yellow
+    Write-Host $separator -BackgroundColor DarkGray -ForegroundColor Yellow
+
     while ($true) {
         # Gather CPU stats for all processes
         $cpuStats = Get-Counter '\Process(*)\% Processor Time' -ErrorAction SilentlyContinue
@@ -211,10 +245,11 @@ try {
 
         # Move cursor to top-left without clearing screen
         $rawUI.CursorPosition = @{X=0;Y=0}
+
         # Used blank lines to skip over header and instructions
-        Write-Host ""
-        Write-Host ""
-        Write-Host ""
+        for ($i = 0; $i -lt 3; $i++) {
+            Write-Host ""
+        }
 
         # Format and display the stats table
         $output = $stats | Format-Table -Property @{Label="ID    ";                   Expression={$_.ID};Width=8;Alignment='Left'},
@@ -225,7 +260,7 @@ try {
                                                   @{Label="NPM(KB)";                  Expression={$_.NPM};Width=9},
                                                   @{Label="Start Time     ";          Expression={$_.StartTime};Width=15;Alignment='Right'} | Out-String
 
-        # Used for debugging invalid samples
+        # Print the results of $output table to the screen
         Write-Host $output -BackgroundColor DarkGray -ForegroundColor Yellow
 
         # Wait before the next update - 5 seconds by default
@@ -233,8 +268,30 @@ try {
     }
 }
 
+# Catch block to handle unexpected errors and store them in a log file
+catch {
+    $errorOutput = $_.Exception.Message
+    $DT = Get-Date -UFormat %d%b%Y
+    Add-Content -Path "$PSScriptRoot\wtop_error.log" -Value "${DT}: $errorOutput"
+    Write-Warning "An unexpected error occurred. Details have been logged to wtop_error.log"
+    $exitCode = 99
+}
+
+# Finally block to ensure cleanup actions are performed
 finally {
-    # Restore original buffer size and cursor visibility
+    # Restore original Window Title and Buffer Size
+    $rawUI.WindowTitle = $initialWindowTitle
     $rawUI.BufferSize = $initialBufferSize
+
+    # Move cursor to just below process screen and make it visible again
     [Console]::CursorVisible = $true
+
+    # Reposition cursor to the appropriate position and exits with appropriate code
+    if ($exitCode) {
+        $rawUI.CursorPosition = @{X=0;Y=$initialCursorPosition.Y + 1}
+        Exit $exitCode
+    } else {
+        $rawUI.CursorPosition = @{X=0;Y=$NumberProcesses + 6}
+        Exit $exitCode
+    }
 }
