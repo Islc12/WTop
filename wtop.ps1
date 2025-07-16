@@ -98,14 +98,13 @@ Exit Codes:
 param(
     [Int32]$WaitTime=5,
     [string]$PriorityStat="CPU",
-    [Int32]$NumberProcesses=20
+    [Int32]$NumberProcesses=($Host.UI.RawUI.WindowSize.Height -9)
 )
 
 $rawUI = $Host.UI.RawUI
 $initialCursorPosition = $rawUI.CursorPosition
 $initialWindowTitle = $rawUI.WindowTitle
 $initialBufferSize = $rawUI.BufferSize
-$initialBackgroundColor = $rawUI.BackgroundColor
 $windowHeight = $rawUI.WindowSize.Height
 $exitCode = $null
 
@@ -136,7 +135,7 @@ try {
     # Stops the program before it starts if the user inputs too many processes to display, as this causes display issues.
     # Eventually I will add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
     if ($NumberProcesses -gt ($windowHeight - 9)) {
-        Write-Warning "NumberProcesses greater than $($windowHeight - 9) causes display issues. Enlarge window or reduce number of processes."
+        Write-Warning "NumberProcesses greater than $($windowHeight - 9) causes display issues. `nEnlarge window, reduce number of processes, or use the default value."
         $exitCode = 40
         break
     }
@@ -157,7 +156,9 @@ try {
         return (' ' * $padLeft) + $Text + (' ' * $padRight)
     }
 
+    # Spelling formatter for correct grammar usage
     $spelling = if ($WaitTime -eq 1) { "second" } else { "seconds" }
+
     # Create and display program header + instruction
     $header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width 115
     $instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width 115
