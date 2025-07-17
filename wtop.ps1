@@ -18,7 +18,7 @@
 
 <# 
 .SYNOPSIS
-    WTop is a script used to gather a collection of the top processes and their resource usage on a machine.
+    WTop is a script used to gather a collection of the top processes and their resource usage on a Windows machine.
 
 .DESCRIPTION
     This is a prototype version of a process resource usage monitor written explicitly for PowerShell. The intended purpose is for a system administrator, or other relevant individual, to be able to monitor important system processes and the resources that they utilize though a PowerShell interface. The best way to run this is to simply Invoke-Command on a remote device. This allows the user to keep the script itself local and not have to add a separate program to n number of devices. Something that be especially important for space restricted remote systems. Currently this has a varied number of bugs and almost no functionality outside of the bare basics. However, it does still work, even if on the most basic of levels and will provide the user with a baseline of information such as PID, Process Name, CPU%, Memory usage, NPM, and start time. As time goes on I will continue to work on this script, hopefully building on it in such a manner that it can be adequately used across servers and other remote systems.
@@ -30,42 +30,44 @@
     Specifies the priority statistic to sort by. Options are "CPU", "Memory", or "NPM". Defaults to "CPU".
 
 .PARAMETER NumberProcesses
-    Specifies the number of processes to display. Defaults to 20. Maximum is 35.
+    Specifies the number of processes to display. Defaults to the maximum number of processes allowable by the current PowerShell window size.
+
+.PARAMETER BackgroundColor
+    Specifies the display background color. Default is system selection.
+
+.PARAMETER TextColor
+    SPecifies the display text color. Default is system selection.
 
 .EXAMPLE
     .\wtop.ps1
 
-    Runs the script with default parameters: 5-second update interval, prioritizing CPU usage, and displaying the top 20 processes. This  is the default behavior if no parameters are provided.
-
+    Runs the script with default parameters.
 .EXAMPLE
     .\wtop.ps1 -WaitTime 2
 
-    Runs the script with a 2-second update interval, prioritizing CPU usage, and displaying the top 20 processes.
+    Runs the script with a 2-second update interval.
 
 .EXAMPLE
     .\wtop.ps1 -PriorityStat Memory
 
-    Runs the script with a 5-second update interval, prioritizing memory usage, and displaying the top 20 processes.
+    Runs the script prioritizing the memory usage statistic.
 
 .EXAMPLE
     .\wtop.ps1 -NumberProcesses 10
 
-    Runs the script with a 5-second update interval, prioritizing CPU usage, and displaying the top 10 processes.
+    Runs the script displaying the top 10 processes.
 
 .EXAMPLE
-    .\wtop.ps1 -WaitTime 3 -PriorityStat NPM
+    .\wtop.ps1 -BackgroundColor DarkGray
 
-    Runs the script with a 3-second update interval, prioritizing non-paged memory usage, and displaying the top 20 processes.
-
-.EXAMPLE
-    .\wtop.ps1 -WaitTime 1 -NumberProcesses 5
-
-    Runs the script with a 1-second update interval, prioritizing CPU usage, and displaying the top 5 processes.
+    Runs the script with a dark gray background.
+    Applicable colors are: Black, DarkBlue, DarkGreen, DarkCyan, DarkRed, DarkMagenta, DarkYellow, Gray, DarkGray, Blue, Green, Cyan, Red, Magenta, Yellow, White
 
 .EXAMPLE
-    .\wtop.ps1 -PriorityStat CPU -NumberProcesses 30
+    .\wtop.ps1 -TextColor Black
 
-    Runs the script with a 5-second update interval, prioritizing CPU usage, and displaying the top 30 processes.
+    Runs the script with a black text color.
+    Applicable colors are: Black, DarkBlue, DarkGreen, DarkCyan, DarkRed, DarkMagenta, DarkYellow, Gray, DarkGray, Blue, Green, Cyan, Red, Magenta, Yellow, White
 
 .EXAMPLE
     .\wtop.ps1 -WaitTime 10 -PriorityStat Memory -NumberProcesses 15
@@ -84,90 +86,148 @@ Date: 26JUN2025
 License: GNU General Public License v3.0
 
 Exit Codes:
-    0   - Successful execution and exit
-    20  - User input error (e.g., WaitTime less than 1 second)
-    21  - User input warning (e.g., WaitTime greater than 60 seconds)
-    30  - User input error (e.g., Invalid PriorityStat value)
-    40  - User input error (e.g., NumberProcesses exceeds maximum allowed)
-    99  - Unexpected error occurred during execution
+    0    - Successful execution and exit
+    1    - WaitTime MIN user input error (e.g., WaitTime less than 1 second)
+    2    - WaitTime MAX user input error (e.g., WaitTime greater than 60 seconds)
+    4    - PriorityStat user input error (e.g., Invalid PriorityStat value)
+    8    - NumberProcesses MAX user input error (e.g., NumberProcesses exceeds maximum allowed)
+    16   - NumberProcesses MIN user input error (e.g., NumberProcesses exceeds minimum allowed)
+    32   - User input error (e.g., Unsupported color choice for shell background)
+    64   - User input error (e.g., Unsupported color choice for shell text)
+    128  - Unexpected error occurred during execution
+    254  - Failed attempt to run on an application other than Windows Console Host
+    255  - Failed atempt to run on a non-Windows operating system
+
+    Exit codes different than this are the result of multiple exit codes added together, meaning there were multiple errors which caused WTop to stop early. For example, an exit code of 9 would be exit code 1 + exit code 8, would mean that there was a WaitTime MIN user input error (Exit 1) and NumberProcesses MAX user input error (Exit 8).
 #>
 
 ###########################################################################################################################################################
 
-# Allows the user to specify a wait time between updates, defaults to 5 seconds if no value is provided
+# Default parameters
+# 5 second interval between process updates
+# CPU is the primary statistic display
+# Total number of processes displayed is based on the users current PowerShell window height
+# Sets the default values for background and text color to the current shell default
 param(
     [Int32]$WaitTime=5,
     [string]$PriorityStat="CPU",
-    [Int32]$NumberProcesses=($Host.UI.RawUI.WindowSize.Height -9)
+    [Int32]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 11,
+    [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
+    [string]$TextColor=$Host.UI.RawUI.ForegroundColor
 )
 
+# This is a Windows only PowerShell script and so this prevents it from being run on another type operating system
+$os = Get-CimInstance Win32_OperatingSystem
+if ($os.Caption -notmatch "Microsoft Windows") {
+    Write-Warning "WTop can only be run on a Microsoft Windows Operating System."
+    exit 255
+}
+
+if ($env:WT_SESSION) {
+    Write-Warning "WTop is designed to be run with Windows Console Host`nModifications may be made to the source code to alter this. However, there is no gurantee on the reliablity of the program if altered."
+    exit 254
+}
+
+if ($rawUI.WindowSize.Width -lt 105) {
+        [Console]::WindowWidth = 105
+}
+
+## Variables
 $rawUI = $Host.UI.RawUI
 $initialCursorPosition = $rawUI.CursorPosition
 $initialWindowTitle = $rawUI.WindowTitle
-$initialBufferSize = $rawUI.BufferSize
+# $initialBufferSize = $rawUI.BufferSize
 $windowHeight = $rawUI.WindowSize.Height
+# Initialize the exitCode variable
 $exitCode = $null
+$restartLine = $null
+$ANSI16 = "Black", "DarkBlue", "DarkGreen", "DarkCyan", "DarkRed", "DarkMagenta", "DarkYellow", "Gray", "DarkGray", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"
+
+# Function to center text within a given width
+function Format-CenteredText {
+    param (
+        [string]$Text,
+        [int]$Width
+    )
+    $padLeft = [math]::Max(0, [math]::Floor(($Width - $Text.Length) / 2))
+    $padRight = [math]::Max(0, $Width - $Text.Length - $padLeft)
+    return (' ' * $padLeft) + $Text + (' ' * $padRight)
+}
+
+function Set-ProgramHeader {
+    # Spelling formatter for correct grammar usage
+    $spelling = if ($WaitTime -eq 1) { "second" } else { "seconds" }
+
+    # Create and display program header + instruction
+    $header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width 104
+    $instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width 104
+    $details = Format-CenteredText -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width 104
+    $separator = '-' * 104
+    Write-Host $header -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
+    Write-Host $instructions -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
+    Write-Host $details -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
+    Write-Host $separator -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
+}
 
 try {
-    # Used to provide a more seamless enviroment, keeps the program from starting where ever it wants to on the shell
-    [Console]::CursorVisible = $false
-    $rawUI.BufferSize = @{ Width = $initialBufferSize.Width; Height = $initialBufferSize.Height }
-    $rawUI.WindowTitle = "WTop - PowerShell Process Viewer"
-
     # Manual validation for WaitTime parameter with custom exit codes
     if ($WaitTime -lt 1) {
         Write-Warning "WaitTime must be at least 1 second."
-        $exitCode = 20
-        break
+        $exitCode = $exitcode + 1
+        $restartLine = $restartLine + 1
     } elseif ($WaitTime -gt 60) {
         Write-Warning "WaitTime greater than 60 seconds is not recommended."
-        $exitCode = 21
-        break
+        $exitCode = $exitcode + 2
+        $restartLine = $restartLine + 1
     }
 
     # Manual validation for PriorityStat parameter with custom exit code
     if ($PriorityStat -notin @("CPU","Memory","NPM")) {
         Write-Warning "PriorityStat must be 'CPU', 'Memory', or 'NPM'."
-        $exitCode = 30
+        $exitCode = 4
+        $restartLine = $restartLine + 1
+    }
+
+    # Warning and exit if the user inputs too many processes to display, as this causes display issues.
+    ### Eventually I will try to add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
+    if ($NumberProcesses -gt ($windowHeight - 11)) {
+        $warningText = "NumberProcesses greater than $($windowHeight - 9) causes display issues. `n`tEnlarge window, reduce number of processes, or use the default value."
+        Write-Warning $warningText
+        $exitCode = $exitcode + 8
+        $restartLine = $restartLine + 2
+    } elseif ($NumberProcesses -le 0) {
+        Write-Warning "Invalid number of processes entered, enter an amount greater than 0."
+        $exitcode = $exitcode + 16
+        $restartLine = $restartLine + 1
+    }
+
+    # Warning and exit due to invalid user input for BackgroundColor, and then gives the user a list of colors they can use
+    if ($BackgroundColor -notin ($ANSI16)) {
+        Write-Warning "BackgroundColor of $BackgroundColor is not a supported ANSI standard-16 color.`n`tAvailable choices are:`n`t$ANSI16"
+        $exitCode = $exitcode + 32
+        $restartLine = $restartLine + 3
+    }
+
+    # Warning and exit due to invalid user input for TextColor, and then gives the user a list of colors they can use
+    if ($TextColor -notin ($ANSI16)) {
+        Write-Warning "TextColor of $TextColor is not a supported ANSI standard-16 color.`n`tAvailable choices are:`n`t$ANSI16"
+        $exitCode = $exitcode + 64
+        $restartLine = $restartLine + 3
+    }
+
+    # If an exit code is produced this will stop the program, we're using this so a user can reference exit codes formulated by any errors
+    if ($exitCode) {
         break
     }
 
-    # Stops the program before it starts if the user inputs too many processes to display, as this causes display issues.
-    # Eventually I will add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
-    if ($NumberProcesses -gt ($windowHeight - 9)) {
-        Write-Warning "NumberProcesses greater than $($windowHeight - 9) causes display issues. `nEnlarge window, reduce number of processes, or use the default value."
-        $exitCode = 40
-        break
-    }
+    $rawUI.WindowTitle = "WTop - PowerShell Process Viewer"
 
-    # Used to clear the terminal screen, avoiding any unintentional overlap in screen output
-    # In the future I will change this to not clear the screen, but rather to start the output at the top of the screen
-    # This will allow for a user to scroll up and see previous output if needed
-    Clear-Host
+    [Console]::CursorVisible = $false
 
-    # Function to center text within a given width
-    function Format-CenteredText {
-        param (
-            [string]$Text,
-            [int]$Width
-        )
-        $padLeft = [math]::Max(0, [math]::Floor(($Width - $Text.Length) / 2))
-        $padRight = [math]::Max(0, $Width - $Text.Length - $padLeft)
-        return (' ' * $padLeft) + $Text + (' ' * $padRight)
-    }
+    $newCursorPosition = @{X=0;Y=$initialCursorPosition.Y}
+    $rawUI.CursorPosition = $newCursorPosition
 
-    # Spelling formatter for correct grammar usage
-    $spelling = if ($WaitTime -eq 1) { "second" } else { "seconds" }
-
-    # Create and display program header + instruction
-    $header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width 115
-    $instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width 115
-    $details = Format-CenteredText -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width 115
-    $separator = '-' * 115
-    Write-Host $header -BackgroundColor DarkGray -ForegroundColor Yellow
-    Write-Host $instructions -BackgroundColor DarkGray -ForegroundColor Yellow
-    Write-Host $details -BackgroundColor DarkGray -ForegroundColor Yellow
-    Write-Host $separator -BackgroundColor DarkGray -ForegroundColor Yellow
+    Set-ProgramHeader
 
     while ($true) {
         # Gather CPU stats for all processes
@@ -196,22 +256,23 @@ try {
 
                 # Normalize CPU% by number of logical processors
                 $logicalCpuCount = [Environment]::ProcessorCount
-                $normalizedCpu = [math]::Round($cpuPercent / $logicalCpuCount, 2)
+                $normalizedCpu = [math]::Round($cpuPercent / $logicalCpuCount, 1)
 
                 # Get process details from the hashtable
                 $proc = $procInfo[$cleanName.ToLower()]
                 $workingSet = if ($proc) { $proc.WorkingSet64 } else { 0 }
                 $npm = if ($proc) { $proc.NonpagedSystemMemorySize64 } else { 0 }
+                $convertNPM = [System.Math]::Round($npm / 1KB, 1)
                 $startTime = if ($proc -and $proc.StartTime) {
                                 try {
-                                    $proc.StartTime.ToString("ddMMMyy HH:mm").ToUpper().PadRight(15)
+                                    $proc.StartTime.ToString("ddMMMyy HH:mm").ToUpper().PadRight(13)
                                 } 
-                                catch { "-".PadRight(15) }
-                            } else { "-".PadRight(15) }
+                                catch { "      -      " }
+                            } else { "      -      " }
 
                 # Calculate memory percentage
                 $memPercent = if ($totalMemory -and $workingSet -gt 0) {
-                    [System.Math]::Round(($workingSet / $totalMemory) * 100, 2)
+                    [System.Math]::Round(($workingSet / $totalMemory) * 100, 1)
                 } else { "-" }
 
                 # Ensure name fits within 50 characters
@@ -224,11 +285,11 @@ try {
                 # Create a custom object for output
                 [PSCustomObject]@{
                     Name        = $nameFixed
-                    ID          = if ($proc) { $proc.Id } else { "-" }
-                    CPUPercent  = [System.Math]::Round($normalizedCpu, 2)
-                    MemoryMB    = if ($proc) { [System.Math]::Round($workingSet / 1MB, 2) } else { "-" }
-                    MemPercent  = $memPercent
-                    NPM = [System.Math]::Round($npm / 1KB, 2)
+                    PID          = if ($proc) { $proc.Id } else { "-" }
+                    CPUPercent  = $normalizedCpu.ToString("F1")
+                    MemoryMB    = if ($proc) { [System.Math]::Round($workingSet / 1MB, 1) } else { "-" }
+                    MemPercent  = $memPercent.ToString("F1")
+                    NPM = $convertNPM.ToString("F1")
                     StartTime = $startTime
                 }
             }
@@ -244,8 +305,8 @@ try {
             # Limit to user-specified number of processes - 20 by default
             $stats = $stats | Select-Object -First $NumberProcesses
 
-        # Move cursor to top-left without clearing screen
-        $rawUI.CursorPosition = @{X=0;Y=0}
+        # # Move cursor to top-left without clearing screen
+        $rawUI.CursorPosition = @{X=0;Y=$newCursorPosition.Y}
 
         # Used blank lines to skip over header and instructions
         for ($i = 0; $i -lt 3; $i++) {
@@ -253,16 +314,16 @@ try {
         }
 
         # Format and display the stats table
-        $output = $stats | Format-Table -Property @{Label="ID    ";                   Expression={$_.ID};Width=8;Alignment='Left'},
+        $output = $stats | Format-Table -AutoSize -Property @{Label="PID     ";                 Expression={$_.PID};Width=8;Alignment='Left'},
                                                   @{Label="Name                    "; Expression={$_.Name};Width=50},
-                                                  @{Label="CPU%";                     Expression={$_.CPUPercent};Width=9},
-                                                  @{Label="Memory(MB)";               Expression={$_.MemoryMB};Width=12},
-                                                  @{Label="Mem%";                     Expression={$_.MemPercent};Width=6},
-                                                  @{Label="NPM(KB)";                  Expression={$_.NPM};Width=9},
-                                                  @{Label="Start Time     ";          Expression={$_.StartTime};Width=15;Alignment='Right'} | Out-String
+                                                  @{Label=" CPU%";                    Expression={$_.CPUPercent};Width=5;Alignment='Right'},
+                                                  @{Label="Memory(MB)";               Expression={$_.MemoryMB};Width=10},
+                                                  @{Label=" Mem%";                    Expression={$_.MemPercent};Width=5;Alignment='Right'},
+                                                  @{Label="NPM(KB)";                  Expression={$_.NPM};Width=7;Alignment='Right'},
+                                                  @{Label="   Start Time";            Expression={$_.StartTime};Width=13;Alignment='Center'} | Out-String
 
         # Print the results of $output table to the screen
-        Write-Host $output -BackgroundColor DarkGray -ForegroundColor Yellow
+        Write-Host $output -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
 
         # Wait before the next update - 5 seconds by default
         Start-Sleep -Seconds $WaitTime
@@ -274,25 +335,24 @@ catch {
     $errorOutput = $_.Exception.Message
     $DT = Get-Date -UFormat %d%b%Y
     Add-Content -Path "$PSScriptRoot\wtop_error.log" -Value "${DT}: $errorOutput"
-    Write-Warning "An unexpected error occurred. Details have been logged to wtop_error.log"
-    $exitCode = 99
+    Write-Warning "ERROR: An unexpected error occurred. Details have been logged to wtop_error.log"
+    $exitCode = 128
 }
 
 # Finally block to ensure cleanup actions are performed
 finally {
     # Restore original Window Title and Buffer Size
     $rawUI.WindowTitle = $initialWindowTitle
-    $rawUI.BufferSize = $initialBufferSize
 
     # Move cursor to just below process screen and make it visible again
     [Console]::CursorVisible = $true
 
     # Reposition cursor to the appropriate position and exits with appropriate code
     if ($exitCode) {
-        $rawUI.CursorPosition = @{X=0;Y=$initialCursorPosition.Y + 1}
+        $rawUI.CursorPosition = @{X=0;Y=$initialCursorPosition.Y + $restartLine}
         Exit $exitCode
     } else {
-        $rawUI.CursorPosition = @{X=0;Y=$NumberProcesses + 6}
+        $rawUI.CursorPosition = @{X=0;Y=$newCursorPosition.Y + $NumberProcesses + 6}
         Exit $exitCode
     }
 }
