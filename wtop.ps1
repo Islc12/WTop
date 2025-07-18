@@ -109,34 +109,31 @@ Exit Codes:
 # Total number of processes displayed is based on the users current PowerShell window height
 # Sets the default values for background and text color to the current shell default
 param(
-    [Int32]$WaitTime=5,
+    # Allows for a refresh rate of no less than 1.401298E-45 seconds. This however isn't going to be possible on probably anything other than a quantom computer.
+    [single]$WaitTime=5,
     [string]$PriorityStat="CPU",
-    [Int32]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 11,
+    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 9,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor
 )
 
 # This is a Windows only PowerShell script and so this prevents it from being run on another type operating system
-$os = Get-CimInstance Win32_OperatingSystem
-if ($os.Caption -notmatch "Microsoft Windows") {
+if ((Get-CimInstance Win32_OperatingSystem) -notmatch "Microsoft Windows") {
     Write-Warning "WTop can only be run on a Microsoft Windows Operating System."
     exit 255
 }
 
+# Enforces that this program should only be run using Windows Console Host and that any other terminal enviroment will either not work OR require 
+# that the user modifies the source code to make it run.
 if ($env:WT_SESSION) {
     Write-Warning "WTop is designed to be run with Windows Console Host`nModifications may be made to the source code to alter this. However, there is no gurantee on the reliablity of the program if altered."
     exit 254
-}
-
-if ($rawUI.WindowSize.Width -lt 105) {
-        [Console]::WindowWidth = 105
 }
 
 ## Variables
 $rawUI = $Host.UI.RawUI
 $initialCursorPosition = $rawUI.CursorPosition
 $initialWindowTitle = $rawUI.WindowTitle
-# $initialBufferSize = $rawUI.BufferSize
 $windowHeight = $rawUI.WindowSize.Height
 # Initialize the exitCode variable
 $exitCode = $null
@@ -169,10 +166,10 @@ function Set-ProgramHeader {
     Write-Host $separator -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
 }
 
-try {
+function Get-ValidInputs {
     # Manual validation for WaitTime parameter with custom exit codes
-    if ($WaitTime -lt 1) {
-        Write-Warning "WaitTime must be at least 1 second."
+    if ($WaitTime -le 0) {
+        Write-Warning "WaitTime must be greater than 0 seconds."
         $exitCode = $exitcode + 1
         $restartLine = $restartLine + 1
     } elseif ($WaitTime -gt 60) {
@@ -190,7 +187,7 @@ try {
 
     # Warning and exit if the user inputs too many processes to display, as this causes display issues.
     ### Eventually I will try to add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
-    if ($NumberProcesses -gt ($windowHeight - 11)) {
+    if ($NumberProcesses -gt ($windowHeight - 9)) {
         $warningText = "NumberProcesses greater than $($windowHeight - 9) causes display issues. `n`tEnlarge window, reduce number of processes, or use the default value."
         Write-Warning $warningText
         $exitCode = $exitcode + 8
@@ -217,15 +214,28 @@ try {
 
     # If an exit code is produced this will stop the program, we're using this so a user can reference exit codes formulated by any errors
     if ($exitCode) {
-        break
+        Exit $exitCode
     }
 
+}
+
+Get-ValidInputs
+
+if ($rawUI.WindowSize.Width -lt 105 ) {
+        [Console]::WindowWidth = 105
+}
+
+try {
     $rawUI.WindowTitle = "WTop - PowerShell Process Viewer"
 
     [Console]::CursorVisible = $false
 
-    $newCursorPosition = @{X=0;Y=$initialCursorPosition.Y}
-    $rawUI.CursorPosition = $newCursorPosition
+    for ($i -eq 0; $i -lt $windowHeight; $i++){
+        Write-Host ""
+    }
+
+    $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
+    $newCursorPosition = $rawUI.CursorPosition
 
     Set-ProgramHeader
 
@@ -306,7 +316,7 @@ try {
             $stats = $stats | Select-Object -First $NumberProcesses
 
         # # Move cursor to top-left without clearing screen
-        $rawUI.CursorPosition = @{X=0;Y=$newCursorPosition.Y}
+        $rawUI.CursorPosition = $newCursorPosition
 
         # Used blank lines to skip over header and instructions
         for ($i = 0; $i -lt 3; $i++) {
@@ -314,13 +324,13 @@ try {
         }
 
         # Format and display the stats table
-        $output = $stats | Format-Table -AutoSize -Property @{Label="PID     ";                 Expression={$_.PID};Width=8;Alignment='Left'},
-                                                  @{Label="Name                    "; Expression={$_.Name};Width=50},
-                                                  @{Label=" CPU%";                    Expression={$_.CPUPercent};Width=5;Alignment='Right'},
-                                                  @{Label="Memory(MB)";               Expression={$_.MemoryMB};Width=10},
-                                                  @{Label=" Mem%";                    Expression={$_.MemPercent};Width=5;Alignment='Right'},
-                                                  @{Label="NPM(KB)";                  Expression={$_.NPM};Width=7;Alignment='Right'},
-                                                  @{Label="   Start Time";            Expression={$_.StartTime};Width=13;Alignment='Center'} | Out-String
+        $output = $stats | Format-Table -Property   @{Label="PID     ";                 Expression={$_.PID};Width=8;Alignment='Left'},
+                                                    @{Label="Name                    "; Expression={$_.Name};Width=50},
+                                                    @{Label=" CPU%";                    Expression={$_.CPUPercent};Width=5;Alignment='Right'},
+                                                    @{Label="Memory(MB)";               Expression={$_.MemoryMB};Width=10},
+                                                    @{Label=" Mem%";                    Expression={$_.MemPercent};Width=5;Alignment='Right'},
+                                                    @{Label="NPM(KB)";                  Expression={$_.NPM};Width=7;Alignment='Right'},
+                                                    @{Label="   Start Time";            Expression={$_.StartTime};Width=13;Alignment='Center'} | Out-String
 
         # Print the results of $output table to the screen
         Write-Host $output -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
@@ -346,7 +356,6 @@ finally {
 
     # Move cursor to just below process screen and make it visible again
     [Console]::CursorVisible = $true
-
     # Reposition cursor to the appropriate position and exits with appropriate code
     if ($exitCode) {
         $rawUI.CursorPosition = @{X=0;Y=$initialCursorPosition.Y + $restartLine}
@@ -356,3 +365,5 @@ finally {
         Exit $exitCode
     }
 }
+
+
