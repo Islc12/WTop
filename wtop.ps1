@@ -200,14 +200,14 @@ function Get-ValidInputs {
 
     # Warning and exit due to invalid user input for BackgroundColor, and then gives the user a list of colors they can use
     if ($BackgroundColor -notin ($ANSI16)) {
-        Write-Warning "BackgroundColor of $BackgroundColor is not a supported ANSI standard-16 color.`n`tAvailable choices are:`n`t$ANSI16"
+        Write-Warning "BackgroundColor of $BackgroundColor is not a supported ANSI standard-16 color.`n`tAvailable choices are: $ANSI16"
         $exitCode = $exitcode + 32
         $restartLine = $restartLine + 3
     }
 
     # Warning and exit due to invalid user input for TextColor, and then gives the user a list of colors they can use
     if ($TextColor -notin ($ANSI16)) {
-        Write-Warning "TextColor of $TextColor is not a supported ANSI standard-16 color.`n`tAvailable choices are:`n`t$ANSI16"
+        Write-Warning "TextColor of $TextColor is not a supported ANSI standard-16 color.`n`tAvailable choices are: $ANSI16"
         $exitCode = $exitcode + 64
         $restartLine = $restartLine + 3
     }
@@ -219,11 +219,11 @@ function Get-ValidInputs {
 
 }
 
-Get-ValidInputs
-
 if ($rawUI.WindowSize.Width -lt 105 ) {
+        Get-ValidInputs
         [Console]::WindowWidth = 105
-}
+        $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
+} else { Get-ValidInputs }
 
 try {
     $rawUI.WindowTitle = "WTop - PowerShell Process Viewer"

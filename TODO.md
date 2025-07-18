@@ -3,7 +3,7 @@
 ### Priority = High
 1. Currently there is an issue with output when a window is shrunk while the program is running. This causes some really off putting formatting errors where lines are crossing over other lines causing the entire table to be printed again in a new location, however even the table looks bad. Adding -AutoSize to the Format-Table action helps with this formatting error, as it initiates text wrapping where appropriate and automatically shrinking the data available as well. Which if a user wants to not see as much that is their own dealing. However, this also causes issues with the relocation of the cursor after the script exits. 
 
-### Priority = Medium
+### Priority = Medium - ***RESOLVED***
 2. Introduce some text wrapping for warning messages. Currently warning messages such as that for -BackgroundColor and -TextColor don't wrap. This leaves users unable to see the full message, which for these parameters in particular means they can't see acceptable choices.
 
 ### Priority = Low
