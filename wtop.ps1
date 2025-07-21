@@ -117,21 +117,25 @@ param(
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor
 )
 
-# This is a Windows only PowerShell script and so this prevents it from being run on another type operating system
-if ((Get-CimInstance Win32_OperatingSystem) -notmatch "Microsoft Windows") {
-    Write-Warning "WTop can only be run on a Microsoft Windows Operating System."
-    exit 255
-}
+function Get-ValidInterfaces {
+    # This is a Windows only PowerShell script and so this prevents it from being run on another type operating system
+    if ((Get-CimInstance Win32_OperatingSystem) -notmatch "Microsoft Windows") {
+        Write-Warning "WTop can only be run on a Microsoft Windows Operating System."
+        exit 255
+    }
 
-# Enforces that this program should only be run using Windows Console Host and that any other terminal enviroment will either not work OR require 
-# that the user modifies the source code to make it run.
-if ($env:WT_SESSION) {
-    Write-Warning "WTop is designed to be run with Windows Console Host`nModifications may be made to the source code to alter this. However, there is no gurantee on the reliablity of the program if altered."
-    exit 254
+    # Enforces that this program should only be run using Windows Console Host and that any other terminal enviroment will either not work OR require 
+    # that the user modifies the source code to make it run.
+    if ($env:WT_SESSION) {
+        Write-Warning "WTop is designed to be run with Windows Console Host`nModifications may be made to the source code to alter this. However, there is no gurantee on the reliablity of the program if altered."
+        exit 254
+    }
 }
 
 ## Variables
 $rawUI = $Host.UI.RawUI
+if ($rawUI.WindowSize.Width -lt 105) {
+    [Console]::WindowWidth = 105 }
 $initialCursorPosition = $rawUI.CursorPosition
 $initialWindowTitle = $rawUI.WindowTitle
 $windowHeight = $rawUI.WindowSize.Height
@@ -219,11 +223,9 @@ function Get-ValidInputs {
 
 }
 
-if ($rawUI.WindowSize.Width -lt 105 ) {
-        Get-ValidInputs
-        [Console]::WindowWidth = 105
-        $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
-} else { Get-ValidInputs }
+Get-ValidInterfaces
+Get-ValidInputs 
+$rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
 
 try {
     $rawUI.WindowTitle = "WTop - PowerShell Process Viewer"
@@ -332,6 +334,12 @@ try {
                                                     @{Label="NPM(KB)";                  Expression={$_.NPM};Width=7;Alignment='Right'},
                                                     @{Label="   Start Time";            Expression={$_.StartTime};Width=13;Alignment='Center'} | Out-String
 
+        # Used to ensure Window Size remains greater than minimum size
+        if ($rawUI.WindowSize.Width -lt 105) {
+            [Console]::WindowWidth = 105
+            $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
+            $newCursorPosition = $rawUI.CursorPosition
+        }
         # Print the results of $output table to the screen
         Write-Host $output -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
 
@@ -365,5 +373,3 @@ finally {
         Exit $exitCode
     }
 }
-
-
