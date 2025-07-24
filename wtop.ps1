@@ -35,6 +35,10 @@
 .PARAMETER BackgroundColor
     Specifies the display background color. Default is system selection.
 
+    *****NOTE*****
+    In Windows Console Host the default background color is black. Even if you modify the background color through properties there won't actually be a color change to a black background.
+    This color option is left in for users who, despite being advised against, choose to use Windows Terminal.
+
 .PARAMETER TextColor
     SPecifies the display text color. Default is system selection.
 
