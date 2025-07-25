@@ -11,3 +11,6 @@
 
 ### Priority = Low
 4. Currently the check and modification for the screen size occurs before any checks occur for valid parameters. While this doesn't change the script running or whether errors are displayed it should be adjusted so that the screen size doesn't modify until after the script checks for valid parameters. However, I was having issues with this earlier, if I ran the screen size modifier inside the try block (even if before the parameter check) it would still execute the finally block causing the new cursor position to jump around. So it seems that this check will need to still occur outside the try block, but also move the parameter check outside the try block, BUT still keep how it handles the parameter check inside the try block.
+
+### Priority = Medium
+5. Add functionality to where WTop will spawn additionally PowerShell processes so that we can execute this script, using the same parameters across multiple remote devices simultaneously. At the moment there are error issues when doing this with the -Credential (Get-Crediential) parameter. 
