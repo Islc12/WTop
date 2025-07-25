@@ -173,5 +173,23 @@ Runs the script remotely with:
 
 ---
 
+## Exit Codes
+
+- `0`    - Successful execution and exit
+- `1`    - WaitTime MIN user input error (e.g., WaitTime less than 1 second)
+- `2`    - WaitTime MAX user input error (e.g., WaitTime greater than 60 seconds)
+- `4`    - PriorityStat user input error (e.g., Invalid PriorityStat value)
+- `8`    - NumberProcesses MAX user input error (e.g., NumberProcesses exceeds maximum allowed)
+- `16`   - NumberProcesses MIN user input error (e.g., NumberProcesses exceeds minimum allowed)
+- `32`   - User input error (e.g., Unsupported color choice for shell background)
+- `64`   - User input error (e.g., Unsupported color choice for shell text)
+- `128`  - Unexpected error occurred during execution
+- `254`  - Failed attempt to run on an application other than Windows Console Host
+- `255`  - Failed atempt to run on a non-Windows operating system
+
+    **Exit codes different than this are the result of multiple exit codes added together, meaning there were multiple errors which caused WTop to stop early. For example, an exit code of 9 would be exit code 1 + exit code 8, would mean that there was a WaitTime MIN user input error (Exit 1) and NumberProcesses MAX user input error (Exit 8).**
+
+---
+
 ## License
 This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.
