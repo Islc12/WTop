@@ -59,13 +59,17 @@
 .EXAMPLE
     .\wtop.ps1 -NumberProcesses 10
 
-    Runs the script displaying the top 10 processes.
+    Runs the script displaying the top 10 processes in order of priority (default priority is CPU usage).
 
 .EXAMPLE
     .\wtop.ps1 -BackgroundColor DarkGray
 
     Runs the script with a dark gray background.
     Applicable colors are: Black, DarkBlue, DarkGreen, DarkCyan, DarkRed, DarkMagenta, DarkYellow, Gray, DarkGray, Blue, Green, Cyan, Red, Magenta, Yellow, White
+
+        *****NOTE*****
+    In Windows Console Host the default background color is black. Even if you modify the background color through properties there won't actually be a color change to a black background.
+    This color option is left in for users who, despite being advised against, choose to use Windows Terminal.
 
 .EXAMPLE
     .\wtop.ps1 -TextColor Black
@@ -79,9 +83,15 @@
     Runs the script with a 10-second update interval, prioritizing memory usage, and displaying the top 15 processes.
 
 .EXAMPLE
-    Invoke-Command -ComputerName "RemoteServer" -FilePath "C:\Path\To\wtop.ps1" -ArgumentList 5, "CPU", 20
+    $args = @(
+            "-WaitTime", 3,
+            "-PriorityStat", "Memory",
+            "-BackgroundColor", "DarkCyan"
+            )
+    $path = "C:\Path\To\wtop.ps1"
+    Invoke-Command -ComputerName "RemoteServer" -FilePath $path -ArgumentList $args
 
-    Executes the script on a remote server with a 5-second update interval, prioritizing CPU usage, and displaying the top 20 processes. This is useful for monitoring processes on remote machines without needing to install additional software. Ensure that PowerShell remoting is enabled and properly configured on the target machine.
+    Executes the script on a remote server with a 3-second update interval, prioritizing Memory usage, and using a DarkCyan background color with all other arguments set to their default.
 
 .NOTES
 Version: 0.1 (Prototype)
@@ -116,11 +126,24 @@ param(
     # Allows for a refresh rate of no less than 1.401298E-45 seconds. This however isn't going to be possible on probably anything other than a quantom computer.
     [single]$WaitTime=5,
     [string]$PriorityStat="CPU",
-    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 9,
+    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 10,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor
 )
 
+## Variables
+$rawUI = $Host.UI.RawUI
+if ($rawUI.WindowSize.Width -lt 105) { [Console]::WindowWidth = 105 }
+$initialCursorPosition = $rawUI.CursorPosition
+$initialWindowTitle = $rawUI.WindowTitle
+$windowHeight = $rawUI.WindowSize.Height
+$validNumProcessInput = $windowHeight - 10
+$exitCode = $null
+$restartLine = $null
+$ANSI16 = "Black", "DarkBlue", "DarkGreen", "DarkCyan", "DarkRed", "DarkMagenta", "DarkYellow", "Gray", "DarkGray", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"
+
+## Functions
+# Checks for valid use interfaces of both Windows OS and Windows Console Host
 function Get-ValidInterfaces {
     # This is a Windows only PowerShell script and so this prevents it from being run on another type operating system
     if ((Get-CimInstance Win32_OperatingSystem) -notmatch "Microsoft Windows") {
@@ -136,19 +159,7 @@ function Get-ValidInterfaces {
     }
 }
 
-## Variables
-$rawUI = $Host.UI.RawUI
-if ($rawUI.WindowSize.Width -lt 105) {
-    [Console]::WindowWidth = 105 }
-$initialCursorPosition = $rawUI.CursorPosition
-$initialWindowTitle = $rawUI.WindowTitle
-$windowHeight = $rawUI.WindowSize.Height
-# Initialize the exitCode variable
-$exitCode = $null
-$restartLine = $null
-$ANSI16 = "Black", "DarkBlue", "DarkGreen", "DarkCyan", "DarkRed", "DarkMagenta", "DarkYellow", "Gray", "DarkGray", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"
-
-# Function to center text within a given width
+# Used to center text within a given width
 function Format-CenteredText {
     param (
         [string]$Text,
@@ -159,6 +170,7 @@ function Format-CenteredText {
     return (' ' * $padLeft) + $Text + (' ' * $padRight)
 }
 
+# Used for program header text
 function Set-ProgramHeader {
     # Spelling formatter for correct grammar usage
     $spelling = if ($WaitTime -eq 1) { "second" } else { "seconds" }
@@ -174,6 +186,7 @@ function Set-ProgramHeader {
     Write-Host $separator -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
 }
 
+# Used to validate user input parameters
 function Get-ValidInputs {
     # Manual validation for WaitTime parameter with custom exit codes
     if ($WaitTime -le 0) {
@@ -195,8 +208,8 @@ function Get-ValidInputs {
 
     # Warning and exit if the user inputs too many processes to display, as this causes display issues.
     ### Eventually I will try to add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
-    if ($NumberProcesses -gt ($windowHeight - 9)) {
-        $warningText = "NumberProcesses greater than $($windowHeight - 9) causes display issues. `n`tEnlarge window, reduce number of processes, or use the default value."
+    if ($NumberProcesses -gt $validNumProcessInput) {
+        $warningText = "NumberProcesses greater than $validNumProcessInput causes display issues. `n`tEnlarge window, reduce number of processes, or use the default value."
         Write-Warning $warningText
         $exitCode = $exitcode + 8
         $restartLine = $restartLine + 2
@@ -224,7 +237,6 @@ function Get-ValidInputs {
     if ($exitCode) {
         Exit $exitCode
     }
-
 }
 
 Get-ValidInterfaces
@@ -234,7 +246,10 @@ $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
 try {
     $rawUI.WindowTitle = "WTop - PowerShell Process Viewer"
 
-    [Console]::CursorVisible = $false
+    try {
+        [Console]::CursorVisible = $false
+    } catch { # No console handle available, skip - typically the case for Invoke-Command
+    }
 
     for ($i -eq 0; $i -lt $windowHeight; $i++){
         Write-Host ""
@@ -341,7 +356,7 @@ try {
         # Used to ensure Window Size remains greater than minimum size
         if ($rawUI.WindowSize.Width -lt 105) {
             [Console]::WindowWidth = 105
-            $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
+            $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 2)}
             $newCursorPosition = $rawUI.CursorPosition
         }
         # Print the results of $output table to the screen
@@ -355,9 +370,9 @@ try {
 # Catch block to handle unexpected errors and store them in a log file
 catch {
     $errorOutput = $_.Exception.Message
-    $DT = Get-Date -UFormat %d%b%Y
-    Add-Content -Path "$PSScriptRoot\wtop_error.log" -Value "${DT}: $errorOutput"
-    Write-Warning "ERROR: An unexpected error occurred. Details have been logged to wtop_error.log"
+    $DT = Get-Date -UFormat "%H:%M:%S %d%b%Y"
+    Write-Warning "ERROR: An unexpected error occurred - $DT."
+    Write-Warning $errorOutput
     $exitCode = 128
 }
 
@@ -367,7 +382,11 @@ finally {
     $rawUI.WindowTitle = $initialWindowTitle
 
     # Move cursor to just below process screen and make it visible again
-    [Console]::CursorVisible = $true
+    try {
+        [Console]::CursorVisible = $true
+    } catch {
+        # Ignore if console handle unavailable - typically the case for Invoke-Command
+    }
     # Reposition cursor to the appropriate position and exits with appropriate code
     if ($exitCode) {
         $rawUI.CursorPosition = @{X=0;Y=$initialCursorPosition.Y + $restartLine}
