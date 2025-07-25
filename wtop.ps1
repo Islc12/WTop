@@ -134,7 +134,7 @@ param(
 ## Variables
 $rawUI = $Host.UI.RawUI
 if ($rawUI.WindowSize.Width -lt 105) { [Console]::WindowWidth = 105 }
-$initialCursorPosition = $rawUI.CursorPosition
+$initialCursorPosition = $rawUI.CursorPosition 
 $initialWindowTitle = $rawUI.WindowTitle
 $windowHeight = $rawUI.WindowSize.Height
 $validNumProcessInput = $windowHeight - 10
@@ -248,7 +248,7 @@ try {
 
     try {
         [Console]::CursorVisible = $false
-    } catch { # No console handle available, skip - typically the case for Invoke-Command
+    } catch { # If no console handle available, skip - typically the case for Invoke-Command
     }
 
     for ($i -eq 0; $i -lt $windowHeight; $i++){
@@ -287,7 +287,7 @@ try {
 
                 # Normalize CPU% by number of logical processors
                 $logicalCpuCount = [Environment]::ProcessorCount
-                $normalizedCpu = [math]::Round($cpuPercent / $logicalCpuCount, 1)
+                $normalizedCpu = [System.Math]::Round($cpuPercent / $logicalCpuCount, 1)
 
                 # Get process details from the hashtable
                 $proc = $procInfo[$cleanName.ToLower()]
@@ -316,12 +316,12 @@ try {
                 # Create a custom object for output
                 [PSCustomObject]@{
                     Name        = $nameFixed
-                    PID          = if ($proc) { $proc.Id } else { "-" }
-                    CPUPercent  = $normalizedCpu.ToString("F1")
-                    MemoryMB    = if ($proc) { [System.Math]::Round($workingSet / 1MB, 1) } else { "-" }
-                    MemPercent  = $memPercent.ToString("F1")
-                    NPM = $convertNPM.ToString("F1")
-                    StartTime = $startTime
+                    PID         = if ($proc) { $proc.Id } else { "-" }
+                    CPUPercent  = $normalizedCpu
+                    MemoryMB    = if ($proc) { [System.Math]::Round($workingSet / 1MB, 1) } else { 0 }
+                    MemPercent  = $memPercent
+                    NPM         = $convertNPM
+                    StartTime   = $startTime
                 }
             }
 
@@ -345,20 +345,24 @@ try {
         }
 
         # Format and display the stats table
-        $output = $stats | Format-Table -Property   @{Label="PID     ";                 Expression={$_.PID};Width=8;Alignment='Left'},
-                                                    @{Label="Name                    "; Expression={$_.Name};Width=50},
-                                                    @{Label=" CPU%";                    Expression={$_.CPUPercent};Width=5;Alignment='Right'},
-                                                    @{Label="Memory(MB)";               Expression={$_.MemoryMB};Width=10},
-                                                    @{Label=" Mem%";                    Expression={$_.MemPercent};Width=5;Alignment='Right'},
-                                                    @{Label="NPM(KB)";                  Expression={$_.NPM};Width=7;Alignment='Right'},
-                                                    @{Label="   Start Time";            Expression={$_.StartTime};Width=13;Alignment='Center'} | Out-String
+        $output = $stats | Format-Table -AutoSize -Property   @{Label="PID     ";                 Expression={$_.PID}; Width=8; Alignment='Left'},
+                                                    @{Label="Name                    "; Expression={$_.Name}; Width=50},
+                                                    @{Label=" CPU%";                    Expression={ "{0:N1}" -f $_.CPUPercent }; Width=5; Alignment='Right'},
+                                                    @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=10; Alignment='Right'},
+                                                    @{Label=" Mem%";                    Expression={ "{0:N1}" -f $_.MemPercent }; Width=5; Alignment='Right'},
+                                                    @{Label="NPM(KB)";                  Expression={ "{0:N1}" -f $_.NPM }; Width=7; Alignment='Right'},
+                                                    @{Label="   Start Time";            Expression={$_.StartTime}; Width=13; Alignment='Center'} | Out-String
 
         # Used to ensure Window Size remains greater than minimum size
         if ($rawUI.WindowSize.Width -lt 105) {
             [Console]::WindowWidth = 105
-            $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 2)}
+            $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
             $newCursorPosition = $rawUI.CursorPosition
         }
+        if ($rawUI.WindowSize.Height -lt $windowHeight) {
+            [Console]::WindowHeight = $windowHeight
+        }
+
         # Print the results of $output table to the screen
         Write-Host $output -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
 
@@ -373,6 +377,7 @@ catch {
     $DT = Get-Date -UFormat "%H:%M:%S %d%b%Y"
     Write-Warning "ERROR: An unexpected error occurred - $DT."
     Write-Warning $errorOutput
+    Add-Content -Path "$PSScriptRoot\wtop_error.log" -Value "${DT}: $errorOutput"
     $exitCode = 128
 }
 
