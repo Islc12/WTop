@@ -128,7 +128,8 @@ param(
     [string]$PriorityStat="CPU",
     [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 10,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
-    [string]$TextColor=$Host.UI.RawUI.ForegroundColor
+    [string]$TextColor=$Host.UI.RawUI.ForegroundColor,
+    [string]$ErrorLog="true"
 )
 
 ## Variables
@@ -203,6 +204,11 @@ function Get-ValidInputs {
     if ($PriorityStat -notin @("CPU","Memory","NPM")) {
         Write-Warning "PriorityStat must be 'CPU', 'Memory', or 'NPM'."
         $exitCode = 4
+        $restartLine = $restartLine + 1
+    }
+
+    if ($ErrorLog -notin @("true","false")) {
+        Write-Warning "ErrorLog must be 'true' or 'false'."
         $restartLine = $restartLine + 1
     }
 
@@ -374,10 +380,12 @@ try {
 # Catch block to handle unexpected errors and store them in a log file
 catch {
     $errorOutput = $_.Exception.Message
-    $DT = Get-Date -UFormat "%H:%M:%S %d%b%Y"
+    $DT = Get-Date -UFormat "%d%b%Y %H:%M:%S"
     Write-Warning "ERROR: An unexpected error occurred - $DT."
     Write-Warning $errorOutput
-    Add-Content -Path "$PSScriptRoot\wtop_error.log" -Value "${DT}: $errorOutput"
+    if ($ErrorLog -eq "true") {
+        Add-Content -Path "$PSScriptRoot\wtop_error.log" -Value "${DT}: $errorOutput"
+    }
     $exitCode = 128
 }
 
