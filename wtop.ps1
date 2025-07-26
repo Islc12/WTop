@@ -129,7 +129,7 @@ param(
     [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 10,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor,
-    [string]$ErrorLog="true"
+    [bool]$ErrorLog=$true # This will be the default while in t development and testing
 )
 
 ## Variables
@@ -207,8 +207,8 @@ function Get-ValidInputs {
         $restartLine = $restartLine + 1
     }
 
-    if ($ErrorLog -notin @("true","false")) {
-        Write-Warning "ErrorLog must be 'true' or 'false'."
+    if ($ErrorLog -notin @($true,$false)) {
+        Write-Warning "ErrorLog must be '`$true' or '`$false'."
         $restartLine = $restartLine + 1
     }
 
@@ -383,7 +383,7 @@ catch {
     $DT = Get-Date -UFormat "%d%b%Y %H:%M:%S"
     Write-Warning "ERROR: An unexpected error occurred - $DT."
     Write-Warning $errorOutput
-    if ($ErrorLog -eq "true") {
+    if ($ErrorLog -eq $true) {
         Add-Content -Path "$PSScriptRoot\wtop_error.log" -Value "${DT}: $errorOutput"
     }
     $exitCode = 128
