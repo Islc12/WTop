@@ -14,3 +14,6 @@
 
 ### Priority = Medium
 5. Add functionality to where WTop will spawn additionally PowerShell processes so that we can execute this script, using the same parameters across multiple remote devices simultaneously. At the moment there are error issues when doing this with the -Credential (Get-Crediential) parameter. 
+
+### Priority = Medium
+6. Added the `-ErrorLog` parameter in order to have functionality for storing errors to a log file. However, we need to do some error checking through parameter validation to ensure that the correct input is used and if not throws a custom error message to exit gracefully.

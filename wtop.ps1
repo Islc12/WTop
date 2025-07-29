@@ -40,7 +40,10 @@
     This color option is left in for users who, despite being advised against, choose to use Windows Terminal.
 
 .PARAMETER TextColor
-    SPecifies the display text color. Default is system selection.
+    Specifies the display text color. Default is system selection.
+
+.PARAMETER ErrorLog
+    Specifies whether to store errors in a log file in addition to displaying errors to standard output. Default during development and testing is $true, afterwards the default will be set to $false.
 
 .EXAMPLE
     .\wtop.ps1
@@ -76,6 +79,11 @@
 
     Runs the script with a black text color.
     Applicable colors are: Black, DarkBlue, DarkGreen, DarkCyan, DarkRed, DarkMagenta, DarkYellow, Gray, DarkGray, Blue, Green, Cyan, Red, Magenta, Yellow, White
+
+.EXAMPLE
+    .\wtop.ps1 -ErrorLog $false
+
+    Runs the script without storing errors in a log file.
 
 .EXAMPLE
     .\wtop.ps1 -WaitTime 10 -PriorityStat Memory -NumberProcesses 15
@@ -129,7 +137,7 @@ param(
     [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 10,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor,
-    [bool]$ErrorLog=$true # This will be the default while in t development and testing
+    [bool]$ErrorLog=$True #Default value of $True will change to $False after development and testing
 )
 
 ## Variables
@@ -206,12 +214,6 @@ function Get-ValidInputs {
         $exitCode = 4
         $restartLine = $restartLine + 1
     }
-
-    if ($ErrorLog -notin @($true,$false)) {
-        Write-Warning "ErrorLog must be '`$true' or '`$false'."
-        $restartLine = $restartLine + 1
-    }
-
     # Warning and exit if the user inputs too many processes to display, as this causes display issues.
     ### Eventually I will try to add scrolling functionality to allow for more processes to be displayed, but for now this is a hard limit.
     if ($NumberProcesses -gt $validNumProcessInput) {
@@ -351,13 +353,13 @@ try {
         }
 
         # Format and display the stats table
-        $output = $stats | Format-Table -AutoSize -Property   @{Label="PID     ";                 Expression={$_.PID}; Width=8; Alignment='Left'},
-                                                    @{Label="Name                    "; Expression={$_.Name}; Width=50},
-                                                    @{Label=" CPU%";                    Expression={ "{0:N1}" -f $_.CPUPercent }; Width=5; Alignment='Right'},
-                                                    @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=10; Alignment='Right'},
-                                                    @{Label=" Mem%";                    Expression={ "{0:N1}" -f $_.MemPercent }; Width=5; Alignment='Right'},
-                                                    @{Label="NPM(KB)";                  Expression={ "{0:N1}" -f $_.NPM }; Width=7; Alignment='Right'},
-                                                    @{Label="   Start Time";            Expression={$_.StartTime}; Width=13; Alignment='Center'} | Out-String
+        $output = $stats | Format-Table -AutoSize -Property @{Label="PID     ";                 Expression={$_.PID}; Width=8; Alignment='Left'},
+                                                            @{Label="Name                    "; Expression={$_.Name}; Width=50},
+                                                            @{Label=" CPU%";                    Expression={ "{0:N1}" -f $_.CPUPercent }; Width=5; Alignment='Right'},
+                                                            @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=10; Alignment='Right'},
+                                                            @{Label=" Mem%";                    Expression={ "{0:N1}" -f $_.MemPercent }; Width=5; Alignment='Right'},
+                                                            @{Label="NPM(KB)";                  Expression={ "{0:N1}" -f $_.NPM }; Width=7; Alignment='Right'},
+                                                            @{Label="   Start Time";            Expression={$_.StartTime}; Width=13; Alignment='Center'} | Out-String
 
         # Used to ensure Window Size remains greater than minimum size
         if ($rawUI.WindowSize.Width -lt 105) {

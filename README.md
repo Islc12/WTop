@@ -13,7 +13,7 @@
 ## Syntax
 
 ```powershell
-wtop.ps1 [[-WaitTime] <Single>] [[-PriorityStat] <String>] [[-NumberProcesses] <Int32>] [[-BackgroundColor] <String>] [[-TextColor] <String>] [<CommonParameters>]
+wtop.ps1 [[-WaitTime] <Single>] [[-PriorityStat] <String>] [[-NumberProcesses] <Int32>] [[-BackgroundColor] <String>] [[-TextColor] <String>]  [[-ErrorLog] <Boolean>] [<CommonParameters>]
 ```
 
 ---
@@ -76,6 +76,15 @@ Sets text (foreground) color for display.
 
 **Available Colors:**  
 _Same list as `BackgroundColor`_
+
+---
+
+### `-ErrorLog <boolean>`
+Determines whether to store errors to a separate log file.
+
+**Options:** To store true: `$True`, `1`
+             To store false: `$False` or `0`
+**Default:** `$False`
 
 ---
 
@@ -147,6 +156,14 @@ Runs the script with **black** text.
 
 ### Example 7
 ```powershell
+.\wtop.ps1 -ErrorLog $False
+```
+Runs the script without storing errors to a log file.
+
+---
+
+### Example 8
+```powershell
 .\wtop.ps1 -WaitTime 10 -PriorityStat Memory -NumberProcesses 15
 ```
 Runs the script with:
@@ -156,7 +173,7 @@ Runs the script with:
 
 ---
 
-### Example 8
+### Example 9
 ```powershell
 $args = @(
     "-WaitTime", 3,
