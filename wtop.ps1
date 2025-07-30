@@ -142,7 +142,17 @@ param(
 
 ## Variables
 $rawUI = $Host.UI.RawUI
-if ($rawUI.WindowSize.Width -lt 105) { [Console]::WindowWidth = 105 }
+$PID_LEN = 8
+$NAME_LEN = 15
+$DESC_LEN = 35
+$CPU_LEN = 5
+$MEMMB_LEN = 10
+$MEMPERC_LEN = 5
+$NPM_LEN = 7
+$STARTTIME_LEN = 13
+$DEAD_SPACE = 8
+$windowWidth = $PID_LEN + $NAME_LEN + $DESC_LEN + $CPU_LEN + $MEMMB_LEN + $MEMPERC_LEN + $NPM_LEN + $STARTTIME_LEN + $DEAD_SPACE
+if ($rawUI.WindowSize.Width -lt $windowWidth) { [Console]::WindowWidth = $windowWidth }
 $initialCursorPosition = $rawUI.CursorPosition 
 $initialWindowTitle = $rawUI.WindowTitle
 $windowHeight = $rawUI.WindowSize.Height
@@ -183,12 +193,13 @@ function Format-CenteredText {
 function Set-ProgramHeader {
     # Spelling formatter for correct grammar usage
     $spelling = if ($WaitTime -eq 1) { "second" } else { "seconds" }
+    $formatWidth = $windowWidth - 1 # -1 to account for the blank space at right edge of the console window 
 
     # Create and display program header + instruction
-    $header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width 104
-    $instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width 104
-    $details = Format-CenteredText -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width 104
-    $separator = '-' * 104
+    $header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width $formatWidth
+    $instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width $formatWidth
+    $details = Format-CenteredText -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width $formatWidth
+    $separator = '-' * $formatWidth
     Write-Host $header -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
     Write-Host $instructions -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
     Write-Host $details -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
@@ -309,16 +320,23 @@ try {
                                 catch { "      -      " }
                             } else { "      -      " }
 
+                $procDescription = if ($proc -and $proc.Description) {
+                                try {
+                                    $proc.Description.Substring(0, [Math]::Min($DESC_LEN, $proc.Description.Length))
+                                } 
+                                catch { "-" }
+                            } else { "-" }
+
                 # Calculate memory percentage
                 $memPercent = if ($totalMemory -and $workingSet -gt 0) {
                     [System.Math]::Round(($workingSet / $totalMemory) * 100, 1)
                 } else { "-" }
 
-                # Ensure name fits within 50 characters
-                $nameFixed = if ($rawName.Length -gt 50) {
-                    $rawName.Substring(0, 50)
+                # Ensure name fits within 15 characters
+                $nameFixed = if ($rawName.Length -gt $NAME_LEN) {
+                    $rawName.Substring(0, $NAME_LEN)
                 } else {
-                    $rawName.PadRight(50)
+                    $rawName.PadRight($NAME_LEN)
                 }
 
                 # Create a custom object for output
@@ -330,6 +348,7 @@ try {
                     MemPercent  = $memPercent
                     NPM         = $convertNPM
                     StartTime   = $startTime
+                    Description = $procDescription
                 }
             }
 
@@ -353,17 +372,18 @@ try {
         }
 
         # Format and display the stats table
-        $output = $stats | Format-Table -AutoSize -Property @{Label="PID     ";                 Expression={$_.PID}; Width=8; Alignment='Left'},
-                                                            @{Label="Name                    "; Expression={$_.Name}; Width=50},
-                                                            @{Label=" CPU%";                    Expression={ "{0:N1}" -f $_.CPUPercent }; Width=5; Alignment='Right'},
-                                                            @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=10; Alignment='Right'},
-                                                            @{Label=" Mem%";                    Expression={ "{0:N1}" -f $_.MemPercent }; Width=5; Alignment='Right'},
-                                                            @{Label="NPM(KB)";                  Expression={ "{0:N1}" -f $_.NPM }; Width=7; Alignment='Right'},
-                                                            @{Label="   Start Time";            Expression={$_.StartTime}; Width=13; Alignment='Center'} | Out-String
+        $output = $stats | Format-Table -AutoSize -Property @{Label="PID     ";                 Expression={$_.PID}; Width=$PID_LEN; Alignment='Left'},
+                                                            @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
+                                                            @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
+                                                            @{Label=" CPU%";                    Expression={ "{0:N1}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
+                                                            @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=$MEMMB_LEN; Alignment='Right'},
+                                                            @{Label=" Mem%";                    Expression={ "{0:N1}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
+                                                            @{Label="NPM(KB)";                  Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
+                                                            @{Label="   Start Time";            Expression={$_.StartTime}; Width=$STARTTIME_LEN; Alignment='Center'} | Out-String
 
-        # Used to ensure Window Size remains greater than minimum size
-        if ($rawUI.WindowSize.Width -lt 105) {
-            [Console]::WindowWidth = 105
+                                                            # Used to ensure Window Size remains greater than minimum size
+        if ($rawUI.WindowSize.Width -lt $windowWidth) {
+            [Console]::WindowWidth = $windowWidth
             $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
             $newCursorPosition = $rawUI.CursorPosition
         }
