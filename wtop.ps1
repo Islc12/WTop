@@ -322,7 +322,9 @@ try {
 
                 $procDescription = if ($proc -and $proc.Description) {
                                 try {
-                                    $proc.Description.Substring(0, [Math]::Min($DESC_LEN, $proc.Description.Length))
+                                    if ($proc.Description.Length -gt $DESC_LEN) {
+                                    $proc.Description.Substring(0, [Math]::Min($DESC_LEN, $proc.Description.Length - 1))
+                                    } else { $proc.Description }
                                 } 
                                 catch { "-" }
                             } else { "-" }
@@ -372,7 +374,7 @@ try {
         }
 
         # Format and display the stats table
-        $output = $stats | Format-Table -AutoSize -Property @{Label="PID     ";                 Expression={$_.PID}; Width=$PID_LEN; Alignment='Left'},
+        $output = $stats | Format-Table -Property @{Label="PID     ";                 Expression={$_.PID}; Width=$PID_LEN; Alignment='Left'},
                                                             @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
                                                             @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
                                                             @{Label=" CPU%";                    Expression={ "{0:N1}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
