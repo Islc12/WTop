@@ -361,7 +361,7 @@ try {
                 "NPM"       { $stats = $stats | Sort-Object NPM -Descending }
                 default     { $stats = $stats | Sort-Object CPUPercent -Descending }
             }
-            
+
             # Limit to user-specified number of processes - 20 by default
             $stats = $stats | Select-Object -First $NumberProcesses
 
