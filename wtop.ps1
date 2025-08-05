@@ -134,7 +134,7 @@ param(
     # Allows for a refresh rate of no less than 1.401298E-45 seconds. This however isn't going to be possible on probably anything other than a quantom computer.
     [single]$WaitTime=3,
     [string]$PriorityStat="CPU",
-    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 11,
+    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 13,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor,
     [bool]$ErrorLog=$True #Default value of $True will change to $False after development and testing
@@ -145,10 +145,10 @@ $rawUI = $Host.UI.RawUI
 $PID_LEN = 8
 $NAME_LEN = 15
 $DESC_LEN = 35
-$CPU_LEN = 5
+$CPU_LEN = 6
 $MEMMB_LEN = 10
-$MEMPERC_LEN = 5
-$NPM_LEN = 7
+$MEMPERC_LEN = 6
+$NPM_LEN = 8
 $STARTTIME_LEN = 13
 $DEAD_SPACE = 8
 $windowWidth = $PID_LEN + $NAME_LEN + $DESC_LEN + $CPU_LEN + $MEMMB_LEN + $MEMPERC_LEN + $NPM_LEN + $STARTTIME_LEN + $DEAD_SPACE
@@ -156,7 +156,7 @@ if ($rawUI.WindowSize.Width -lt $windowWidth) { [Console]::WindowWidth = $window
 $initialCursorPosition = $rawUI.CursorPosition 
 $initialWindowTitle = $rawUI.WindowTitle
 $windowHeight = $rawUI.WindowSize.Height
-$validNumProcessInput = $windowHeight - 11
+$validNumProcessInput = $windowHeight - 13
 $exitCode = $null
 $restartLine = $null
 $ANSI16 = "Black", "DarkBlue", "DarkGreen", "DarkCyan", "DarkRed", "DarkMagenta", "DarkYellow", "Gray", "DarkGray", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"
@@ -308,7 +308,7 @@ try {
 
                 # Normalize CPU% by number of logical processors
                 $logicalCpuCount = [Environment]::ProcessorCount
-                $normalizedCpu = [System.Math]::Round($cpuPercent / $logicalCpuCount, 1)
+                $normalizedCpu = [System.Math]::Round($cpuPercent / $logicalCpuCount, 2)
 
                 # Get process details from the hashtable
                 $proc = $procInfo[$cleanName.ToLower()]
@@ -333,7 +333,7 @@ try {
 
                 # Calculate memory percentage
                 $memPercent = if ($totalMemory -and $workingSet -gt 0) {
-                    [System.Math]::Round(($workingSet / $totalMemory) * 100, 1)
+                    [System.Math]::Round(($workingSet / $totalMemory) * 100, 2)
                 } else { "-" }
 
                 # Ensure name fits within 15 characters
@@ -348,7 +348,7 @@ try {
                     Name        = $nameFixed
                     PID         = if ($proc) { $proc.Id } else { "-" }
                     CPUPercent  = $normalizedCpu
-                    MemoryMB    = if ($proc) { [System.Math]::Round($workingSet / 1MB, 1) } else { 0 }
+                    MemoryMB    = if ($proc) { [System.Math]::Round($workingSet / 1MB, 2) } else { 0 }
                     MemPercent  = $memPercent
                     NPM         = $convertNPM
                     StartTime   = $startTime
@@ -379,10 +379,10 @@ try {
         $output = $stats | Format-Table -Property @{Label="PID     ";                 Expression={$_.PID}; Width=$PID_LEN; Alignment='Left'},
                                                             @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
                                                             @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
-                                                            @{Label=" CPU%";                    Expression={ "{0:N1}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
+                                                            @{Label="  CPU%";                    Expression={ "{0:N2}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
                                                             @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=$MEMMB_LEN; Alignment='Right'},
-                                                            @{Label=" Mem%";                    Expression={ "{0:N1}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
-                                                            @{Label="NPM(KB)";                  Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
+                                                            @{Label="  Mem%";                    Expression={ "{0:N2}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
+                                                            @{Label=" NPM(KB)";                  Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
                                                             @{Label="   Start Time";            Expression={$_.StartTime}; Width=$STARTTIME_LEN; Alignment='Center'} | Out-String
 
                                                             # Used to ensure Window Size remains greater than minimum size
@@ -394,6 +394,19 @@ try {
         if ($rawUI.WindowSize.Height -lt $windowHeight) {
             [Console]::WindowHeight = $windowHeight
         }
+
+        # Calculate the total amount of resources being used by the processes
+        $totalCpu = ($stats | Measure-Object -Property CPUPercent -Sum).Sum
+        $totalMemory = ($stats | Measure-Object -Property MemoryMB -Sum).Sum
+        $availableMemory = (Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1MB
+        $memoryPerc = $totalMemory / $availableMemory * 100
+        $totalNPM = ($stats | Measure-Object -Property NPM -Sum).Sum
+
+        # Create a summary line for total resources used
+        $summaryLine = "Total Resource Usage —— CPU Usage%: {0:N2}% | Memory: {1:N1} MB | Memory%: {2:N2} % | NPM: {3:N1} KB" -f $totalCpu, $totalMemory, $memoryPerc, $totalNPM
+        $summaryLine = Format-CenteredText -Text $summaryLine -Width $windowWidth
+        # Add the summary line to the output
+        $output += $summaryLine
 
         # Print the results of $output table to the screen
         Write-Host $output -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
@@ -431,7 +444,7 @@ finally {
         $rawUI.CursorPosition = @{X=0;Y=$initialCursorPosition.Y + $restartLine}
         Exit $exitCode
     } else {
-        $rawUI.CursorPosition = @{X=0;Y=$newCursorPosition.Y + $NumberProcesses + 7}
+        $rawUI.CursorPosition = @{X=0;Y=$newCursorPosition.Y + $NumberProcesses + 9}
         Exit $exitCode
     }
 }
