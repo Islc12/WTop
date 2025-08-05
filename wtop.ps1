@@ -24,7 +24,7 @@
     This is a prototype version of a process resource usage monitor written explicitly for PowerShell. The intended purpose is for a system administrator, or other relevant individual, to be able to monitor important system processes and the resources that they utilize though a PowerShell interface. The best way to run this is to simply Invoke-Command on a remote device. This allows the user to keep the script itself local and not have to add a separate program to n number of devices. Something that be especially important for space restricted remote systems. Currently this has a varied number of bugs and almost no functionality outside of the bare basics. However, it does still work, even if on the most basic of levels and will provide the user with a baseline of information such as PID, Process Name, CPU%, Memory usage, NPM, and start time. As time goes on I will continue to work on this script, hopefully building on it in such a manner that it can be adequately used across servers and other remote systems.
 
 .PARAMETER WaitTime
-    Specifies the wait time between updates in seconds. Defaults to 5 seconds.
+    Specifies the wait time between updates in seconds. Defaults to 3 seconds.
 
 .PARAMETER PriorityStat
     Specifies the priority statistic to sort by. Options are "CPU", "Memory", or "NPM". Defaults to "CPU".
@@ -132,9 +132,9 @@ Exit Codes:
 # Sets the default values for background and text color to the current shell default
 param(
     # Allows for a refresh rate of no less than 1.401298E-45 seconds. This however isn't going to be possible on probably anything other than a quantom computer.
-    [single]$WaitTime=5,
+    [single]$WaitTime=3,
     [string]$PriorityStat="CPU",
-    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 10,
+    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 11,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor,
     [bool]$ErrorLog=$True #Default value of $True will change to $False after development and testing
@@ -156,7 +156,7 @@ if ($rawUI.WindowSize.Width -lt $windowWidth) { [Console]::WindowWidth = $window
 $initialCursorPosition = $rawUI.CursorPosition 
 $initialWindowTitle = $rawUI.WindowTitle
 $windowHeight = $rawUI.WindowSize.Height
-$validNumProcessInput = $windowHeight - 10
+$validNumProcessInput = $windowHeight - 11
 $exitCode = $null
 $restartLine = $null
 $ANSI16 = "Black", "DarkBlue", "DarkGreen", "DarkCyan", "DarkRed", "DarkMagenta", "DarkYellow", "Gray", "DarkGray", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"
@@ -197,10 +197,12 @@ function Set-ProgramHeader {
 
     # Create and display program header + instruction
     $header = Format-CenteredText -Text "Wtop - PowerShell Terminal Process Viewer" -Width $formatWidth
+    $hostComputer = Format-CenteredText -Text "Monitoring processes on: $($env:COMPUTERNAME)" -Width $formatWidth
     $instructions = Format-CenteredText -Text "Press Ctrl+C to exit" -Width $formatWidth
     $details = Format-CenteredText -Text "Displays top $NumberProcesses of $PriorityStat consuming processes, updated every $waitTime $spelling." -Width $formatWidth
     $separator = '-' * $formatWidth
     Write-Host $header -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
+    Write-Host $hostComputer -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
     Write-Host $instructions -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
     Write-Host $details -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
     Write-Host $separator -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
@@ -369,7 +371,7 @@ try {
         $rawUI.CursorPosition = $newCursorPosition
 
         # Used blank lines to skip over header and instructions
-        for ($i = 0; $i -lt 3; $i++) {
+        for ($i = 0; $i -lt 4; $i++) {
             Write-Host ""
         }
 
@@ -429,7 +431,7 @@ finally {
         $rawUI.CursorPosition = @{X=0;Y=$initialCursorPosition.Y + $restartLine}
         Exit $exitCode
     } else {
-        $rawUI.CursorPosition = @{X=0;Y=$newCursorPosition.Y + $NumberProcesses + 6}
+        $rawUI.CursorPosition = @{X=0;Y=$newCursorPosition.Y + $NumberProcesses + 7}
         Exit $exitCode
     }
 }
