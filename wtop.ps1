@@ -134,7 +134,7 @@ param(
     # Allows for a refresh rate of no less than 1.401298E-45 seconds. This however isn't going to be possible on probably anything other than a quantom computer.
     [single]$WaitTime=3,
     [string]$PriorityStat="CPU",
-    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 13,
+    [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 11,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor,
     [bool]$ErrorLog=$True #Default value of $True will change to $False after development and testing
@@ -156,7 +156,7 @@ if ($rawUI.WindowSize.Width -lt $windowWidth) { [Console]::WindowWidth = $window
 $initialCursorPosition = $rawUI.CursorPosition 
 $initialWindowTitle = $rawUI.WindowTitle
 $windowHeight = $rawUI.WindowSize.Height
-$validNumProcessInput = $windowHeight - 13
+$validNumProcessInput = $windowHeight - 11
 $exitCode = $null
 $restartLine = $null
 $ANSI16 = "Black", "DarkBlue", "DarkGreen", "DarkCyan", "DarkRed", "DarkMagenta", "DarkYellow", "Gray", "DarkGray", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"
@@ -403,13 +403,16 @@ try {
         $totalNPM = ($stats | Measure-Object -Property NPM -Sum).Sum
 
         # Create a summary line for total resources used
-        $summaryLine = "Total Resource Usage —— CPU Usage%: {0:N2}% | Memory: {1:N1} MB | Memory%: {2:N2} % | NPM: {3:N1} KB" -f $totalCpu, $totalMemory, $memoryPerc, $totalNPM
-        $summaryLine = Format-CenteredText -Text $summaryLine -Width $windowWidth
+        $summaryText = "Total Resource Usage —— CPU Usage%: {0:N2}% | Memory: {1:N1} MB | Memory%: {2:N2} % | NPM: {3:N1} KB" -f $totalCpu, $totalMemory, $memoryPerc, $totalNPM
+        $summaryLine = Format-CenteredText -Text $summaryText -Width $($windowWidth - 1)
         # Add the summary line to the output
-        $output += $summaryLine
-
+        
+        $output = $output.TrimEnd("`r", "`n") # Remove trailing newlines
         # Print the results of $output table to the screen
         Write-Host $output -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
+        $separator = '-' * $($windowWidth - 1) # Create a separator line based on the window width
+        Write-Host $separator -BackgroundColor $BackgroundColor -ForegroundColor $TextColor
+        Write-Host $summaryLine -BackGroundColor $BackgroundColor -ForegroundColor $TextColor
 
         # Wait before the next update - 5 seconds by default
         Start-Sleep -Seconds $WaitTime
