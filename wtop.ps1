@@ -377,13 +377,13 @@ try {
 
         # Format and display the stats table
         $output = $stats | Format-Table -Property @{Label="PID     ";                 Expression={$_.PID}; Width=$PID_LEN; Alignment='Left'},
-                                                            @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
-                                                            @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
-                                                            @{Label="  CPU%";                    Expression={ "{0:N2}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
-                                                            @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=$MEMMB_LEN; Alignment='Right'},
-                                                            @{Label="  Mem%";                    Expression={ "{0:N2}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
-                                                            @{Label=" NPM(KB)";                  Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
-                                                            @{Label="   Start Time";            Expression={$_.StartTime}; Width=$STARTTIME_LEN; Alignment='Center'} | Out-String
+                                                  @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
+                                                  @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
+                                                  @{Label="  CPU%";                   Expression={ "{0:N2}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
+                                                  @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=$MEMMB_LEN; Alignment='Right'},
+                                                  @{Label="  Mem%";                   Expression={ "{0:N2}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
+                                                  @{Label=" NPM(KB)";                 Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
+                                                  @{Label="   Start Time";            Expression={$_.StartTime}; Width=$STARTTIME_LEN; Alignment='Center'} | Out-String
 
                                                             # Used to ensure Window Size remains greater than minimum size
         if ($rawUI.WindowSize.Width -lt $windowWidth) {
