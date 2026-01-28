@@ -1,0 +1,2 @@
+# This directory is for holding error logs related to WTop development and testing.
+# Individual Error logs are ignored however so that mistaken pushes cannot overwrite other log data.

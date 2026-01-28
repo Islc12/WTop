@@ -1,8 +1,12 @@
 
 # WTop – Windows Top Processes Monitor
 
-**Path:**  
-`C:\Path\To\WTop\wtop.ps1`
+**Adding WTop to your systems path**
+```powershell
+Set-Location Wtop
+$wtopPath = Resolve-Path src\
+$Env:PATH += ";$wtopPath"
+```
 
 ## Synopsis
 
@@ -13,7 +17,7 @@
 ## Syntax
 
 ```powershell
-wtop.ps1 [[-WaitTime] <Single>] [[-PriorityStat] <String>] [[-NumberProcesses] <Int32>] [[-BackgroundColor] <String>] [[-TextColor] <String>]  [[-ErrorLog] <Boolean>] [<CommonParameters>]
+WTop [[-WaitTime] <Single>] [[-PriorityStat] <String>] [[-NumberProcesses] <Int32>] [[-BackgroundColor] <String>] [[-TextColor] <String>]  [[-ErrorLog] <Boolean>] [<CommonParameters>]
 ```
 
 ---
@@ -41,7 +45,10 @@ Run using `Invoke-Command` on a remote machine to avoid installing additional so
 
 ### `-WaitTime <Single>`
 Specifies the interval (in seconds) between updates.  
-**Default:** `5`
+**Default:** `3`
+
+**Minimum:** `>0`
+**Maximum:** `60`
 
 ---
 
@@ -176,7 +183,7 @@ Runs the script with:
 ### Example 9
 ```powershell
 $args = @(
-    "-WaitTime", 3,
+    "-WaitTime", 4,
     "-PriorityStat", "Memory",
     "-BackgroundColor", "DarkCyan"
 )
@@ -184,7 +191,7 @@ $path = "C:\Path\To\wtop.ps1"
 Invoke-Command -ComputerName "RemoteServer" -FilePath $path -ArgumentList $args
 ```
 Runs the script remotely with:
-- 3-second update interval
+- 4-second update interval
 - Memory usage sorting
 - DarkCyan background
 

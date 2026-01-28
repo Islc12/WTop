@@ -15,5 +15,5 @@
 ### Priority = Medium
 5. Add functionality to where WTop will spawn additionally PowerShell processes so that we can execute this script, using the same parameters across multiple remote devices simultaneously. At the moment there are error issues when doing this with the -Credential (Get-Crediential) parameter. 
 
-### Priority = Medium
-6. Added the `-ErrorLog` parameter in order to have functionality for storing errors to a log file. However, we need to do some error checking through parameter validation to ensure that the correct input is used and if not throws a custom error message to exit gracefully.
+### Priority = High
+6. Complete Invoke-WTop script. This will serve to provide the user a built in method for using WTop on remote devices, or to simply use WTop on the localhost when the default terminal session is Windows Terminal. At the moment it is mostly completed. However, due to it having to spawn a new process there are some bugs that still need to be worked out. When Invoke-WTop is completed I will remove it from the .gitignore file.

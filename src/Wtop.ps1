@@ -138,7 +138,7 @@ param(
     [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 11,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor,
-    [bool]$ErrorLog=$True #Default value of $True will change to $False after development and testing
+    [bool]$ErrorLog=$False
 )
 
 ## Variables
@@ -428,7 +428,7 @@ catch {
     Write-Warning "ERROR: An unexpected error occurred - $DT."
     Write-Warning $errorOutput
     if ($ErrorLog -eq $true) {
-        Add-Content -Path "$PSScriptRoot\wtop_error.log" -Value "${DT}: $errorOutput"
+        Add-Content -Path "$PSScriptRoot\..\log\wtop_error.log" -Value "${DT}: $errorOutput"
     }
     $exitCode = 128
 }
