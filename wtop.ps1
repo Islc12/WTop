@@ -15,7 +15,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 ###########################################################################################################################################################
-
 <# 
 .SYNOPSIS
     WTop is a script used to gather a collection of the top processes and their resource usage on a Windows machine.
@@ -124,9 +123,11 @@ Exit Codes:
 #>
 
 ###########################################################################################################################################################
+# Sets the minimum required PowerShell version to run this program, this may work for other version of PowerShell, however I have only tested using PowerShell 7.x
+#Requires -Version 7
 
 # Default parameters
-# 5 second interval between process updates
+# 3 second interval between process updates
 # CPU is the primary statistic display
 # Total number of processes displayed is based on the users current PowerShell window height
 # Sets the default values for background and text color to the current shell default
@@ -172,7 +173,8 @@ function Get-ValidInterfaces {
 
     # Enforces that this program should only be run using Windows Console Host and that any other terminal enviroment will either not work OR require 
     # that the user modifies the source code to make it run.
-    if ($env:WT_SESSION) {
+    # Hard check for Windows Console Host by checking if the parent process is explorer.exe, prevents execution in other terminal emulators such as Windows Terminal, ConEmu, etc. 
+    if ((Get-Process -Id $PID).Parent.ProcessName -ne 'explorer') {
         Write-Warning "WTop is designed to be run with Windows Console Host`nModifications may be made to the source code to alter this. However, there is no gurantee on the reliablity of the program if altered."
         exit 254
     }
@@ -377,13 +379,13 @@ try {
 
         # Format and display the stats table
         $output = $stats | Format-Table -Property @{Label="PID     ";                 Expression={$_.PID}; Width=$PID_LEN; Alignment='Left'},
-                                                  @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
-                                                  @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
-                                                  @{Label="  CPU%";                   Expression={ "{0:N2}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
-                                                  @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=$MEMMB_LEN; Alignment='Right'},
-                                                  @{Label="  Mem%";                   Expression={ "{0:N2}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
-                                                  @{Label=" NPM(KB)";                 Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
-                                                  @{Label="   Start Time";            Expression={$_.StartTime}; Width=$STARTTIME_LEN; Alignment='Center'} | Out-String
+                                                @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
+                                                @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
+                                                @{Label="  CPU%";                   Expression={ "{0:N2}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
+                                                @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=$MEMMB_LEN; Alignment='Right'},
+                                                @{Label="  Mem%";                   Expression={ "{0:N2}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
+                                                @{Label=" NPM(KB)";                 Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
+                                                @{Label="   Start Time";            Expression={$_.StartTime}; Width=$STARTTIME_LEN; Alignment='Center'} | Out-String
 
                                                             # Used to ensure Window Size remains greater than minimum size
         if ($rawUI.WindowSize.Width -lt $windowWidth) {
