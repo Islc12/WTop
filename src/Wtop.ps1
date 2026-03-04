@@ -174,8 +174,12 @@ function Get-ValidInterfaces {
     # Enforces that this program should only be run using Windows Console Host and that any other terminal enviroment will either not work OR require 
     # that the user modifies the source code to make it run.
     # Hard check for Windows Console Host by checking if the parent process is explorer.exe, prevents execution in other terminal emulators such as Windows Terminal, ConEmu, etc. 
-    if ((Get-Process -Id $PID).Parent.ProcessName -ne 'explorer') {
-        Write-Warning "WTop is designed to be run with Windows Console Host`nModifications may be made to the source code to alter this. However, there is no gurantee on the reliablity of the program if altered."
+    $proc = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $PID"
+    $parentProcess = $proc.ParentProcessId
+    $processName = (Get-Process -Id $parentProcess).ProcessName
+    if ($processName -notin @('conhost','explorer','svchost')) {
+        Write-Warning "Current shell session is - $processName`n"
+        Write-Warning "WTop is designed to be run with Windows Console Host only.`nWhile modifications may be made to the source code to alter this, there is no gurantee on the reliablity of the program."
         exit 254
     }
 }
@@ -335,7 +339,7 @@ try {
 
                 # Calculate memory percentage
                 $memPercent = if ($totalMemory -and $workingSet -gt 0) {
-                    [System.Math]::Round(($workingSet / $totalMemory) * 100, 2)
+                    [System.Math]::Round(($workingSet / $totalMemory) * 1000, 2)
                 } else { "-" }
 
                 # Ensure name fits within 15 characters
@@ -379,15 +383,15 @@ try {
 
         # Format and display the stats table
         $output = $stats | Format-Table -Property @{Label="PID     ";                 Expression={$_.PID}; Width=$PID_LEN; Alignment='Left'},
-                                                @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
-                                                @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
-                                                @{Label="  CPU%";                   Expression={ "{0:N2}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
-                                                @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=$MEMMB_LEN; Alignment='Right'},
-                                                @{Label="  Mem%";                   Expression={ "{0:N2}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
-                                                @{Label=" NPM(KB)";                 Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
-                                                @{Label="   Start Time";            Expression={$_.StartTime}; Width=$STARTTIME_LEN; Alignment='Center'} | Out-String
+                                                  @{Label="Name           ";          Expression={$_.Name}; Width=$NAME_LEN},
+                                                  @{Label="Description             "; Expression={$_.Description}; Width=$DESC_LEN},
+                                                  @{Label="  CPU%";                   Expression={ "{0:N2}" -f $_.CPUPercent }; Width=$CPU_LEN; Alignment='Right'},
+                                                  @{Label="Memory(MB)";               Expression={ "{0:N1}" -f $_.MemoryMB }; Width=$MEMMB_LEN; Alignment='Right'},
+                                                  @{Label="  Mem%";                   Expression={ "{0:N2}" -f $_.MemPercent }; Width=$MEMPERC_LEN; Alignment='Right'},
+                                                  @{Label=" NPM(KB)";                 Expression={ "{0:N1}" -f $_.NPM }; Width=$NPM_LEN; Alignment='Right'},
+                                                  @{Label="   Start Time";            Expression={$_.StartTime}; Width=$STARTTIME_LEN; Alignment='Center'} | Out-String
 
-                                                            # Used to ensure Window Size remains greater than minimum size
+        # Used to ensure Window Size remains greater than minimum size
         if ($rawUI.WindowSize.Width -lt $windowWidth) {
             [Console]::WindowWidth = $windowWidth
             $rawUI.CursorPosition = @{X=0;Y=$($initialCursorPosition.Y + 1)}
@@ -401,7 +405,7 @@ try {
         $totalCpu = ($stats | Measure-Object -Property CPUPercent -Sum).Sum
         $totalMemory = ($stats | Measure-Object -Property MemoryMB -Sum).Sum
         $availableMemory = (Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1MB
-        $memoryPerc = $totalMemory / $availableMemory * 100
+        $memoryPerc = $totalMemory / $availableMemory * 1000
         $totalNPM = ($stats | Measure-Object -Property NPM -Sum).Sum
 
         # Create a summary line for total resources used
