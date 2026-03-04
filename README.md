@@ -215,5 +215,27 @@ Runs the script remotely with:
 
 ---
 
+## Description
+
+**Invoke-Wtop** is a PowerShell-based script that enhances the functionality of Wtop by providing a quick and easy way of monitoring remote machines Invoke-Wtop sets a few parameters automatically at start up. These parameters include -BackgroundColor (random color), -TextColor (white), -PriorityStat (cpu), -WaitTime (3), as well as sets a default screen size. This was done so that the user can monitor multiple resources at once with each resource having a standard set of critera while simulatenously standing out, making it easier for the user to, at a glance, see which session belongs to which remote device. These settings can be adjusted in the source code found at Wtop/src/Invoke-Wtop.ps1
+
+Invoke-Wtop does require admin credentials to run, this is due to the nature of the Invoke-Command cmdlet needing credentials to run on remote devices.
+
+---
+
+## Syntax
+
+```powershell
+Invoke-Wtop -ComputerName <String> [<CommonParameters>]
+```
+
+---
+
+## Example 1
+```powershell
+Invoke-Wtop -ComputerName My-Remote-Desktop
+```
+Opens up Wtop in a separate console host using 
+
 ## License
 This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.
