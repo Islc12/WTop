@@ -138,7 +138,8 @@ param(
     [int]$NumberProcesses=$Host.UI.RawUI.WindowSize.Height - 11,
     [string]$BackgroundColor=$Host.UI.RawUI.BackgroundColor,
     [string]$TextColor=$Host.UI.RawUI.ForegroundColor,
-    [bool]$ErrorLog=$False
+    # Proper validation occurs in Get-ValidInputs function.
+    $ErrorLog = $False
 )
 
 ## Variables
@@ -258,6 +259,18 @@ function Get-ValidInputs {
         Write-Warning "TextColor of $TextColor is not a supported ANSI standard-16 color.`n`tAvailable choices are: $ANSI16"
         $exitCode = $exitcode + 64
         $restartLine = $restartLine + 3
+    }
+
+    ## Normalize ErrorLog value. Must strictly be true/false, $true/$false, or 1/0.
+    if ($ErrorLog -isnot [bool]) {
+        switch -Regex ($ErrorLog) {
+            '^(?i:true|1)$' { $ErrorLog = $true; break }
+            '^(?i:false|0)$' { $ErrorLog = $false; break }
+            default {
+                Write-Warning "ErrorLog value '$ErrorLog' is not a valid boolean. Value must be true/false, `$true/`$false, or 1/0."
+                exit 128
+            }
+        }
     }
 
     # If an exit code is produced this will stop the program, we're using this so a user can reference exit codes formulated by any errors
