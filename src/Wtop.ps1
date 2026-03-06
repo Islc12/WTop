@@ -291,15 +291,12 @@ try {
         # Gather CPU stats for all processes
         $cpuStats = Get-Counter '\Process(*)\% Processor Time' -ErrorAction SilentlyContinue
 
-        # Get total physical memory for memory percentage calculations
-        $totalMemory = (Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory
+        # Get OS info for memory calculations
+        $OS = Get-CimInstance -ClassName Win32_OperatingSystem
+        $totalVisibleMemory = $OS.TotalVisibleMemorySize
+        $usedMemory = $totalVisibleMemory - $OS.FreePhysicalMemory
+        $usedMemoryBytes = $usedMemory * 1024  # Convert KB to bytes
         $validSamples = $cpuStats.CounterSamples | Where-Object { $_.Status -eq 0 }
-
-        # Create a hashtable of process info for quick lookup
-        $procInfo = @{}
-        Get-Process | ForEach-Object {
-            $procInfo[$_.Name.ToLower()] = $_
-        }
 
         # Process and aggregate CPU usage, normalize by logical CPU count
         $stats = $validSamples |
@@ -316,30 +313,31 @@ try {
                 $logicalCpuCount = [Environment]::ProcessorCount
                 $normalizedCpu = [System.Math]::Round($cpuPercent / $logicalCpuCount, 2)
 
-                # Get process details from the hashtable
-                $proc = $procInfo[$cleanName.ToLower()]
-                $workingSet = if ($proc) { $proc.WorkingSet64 } else { 0 }
-                $npm = if ($proc) { $proc.NonpagedSystemMemorySize64 } else { 0 }
+                # Get all processes with this name and sum their memory
+                $procs = Get-Process -Name $cleanName -ErrorAction SilentlyContinue
+                $workingSet = ($procs | Measure-Object WorkingSet64 -Sum).Sum
+                $npm = ($procs | Measure-Object NonpagedSystemMemorySize64 -Sum).Sum
                 $convertNPM = [System.Math]::Round($npm / 1KB, 1)
-                $startTime = if ($proc -and $proc.StartTime) {
+                $procId = if ($procs) { $procs[0].Id } else { "-" }
+                $startTime = if ($procs -and $procs[0].StartTime) {
                                 try {
-                                    $proc.StartTime.ToString("ddMMMyy HH:mm").ToUpper().PadRight(13)
+                                    $procs[0].StartTime.ToString("ddMMMyy HH:mm").ToUpper().PadRight(13)
                                 } 
                                 catch { "      -      " }
                             } else { "      -      " }
 
-                $procDescription = if ($proc -and $proc.Description) {
+                $procDescription = if ($procs -and $procs[0].Description) {
                                 try {
-                                    if ($proc.Description.Length -gt $DESC_LEN) {
-                                    $proc.Description.Substring(0, [Math]::Min($DESC_LEN, $proc.Description.Length - 1))
-                                    } else { $proc.Description }
+                                    if ($procs[0].Description.Length -gt $DESC_LEN) {
+                                    $procs[0].Description.Substring(0, [Math]::Min($DESC_LEN, $procs[0].Description.Length - 1))
+                                    } else { $procs[0].Description }
                                 } 
                                 catch { "-" }
                             } else { "-" }
 
-                # Calculate memory percentage
-                $memPercent = if ($totalMemory -and $workingSet -gt 0) {
-                    [System.Math]::Round(($workingSet / $totalMemory) * 1000, 2)
+                # Calculate memory percentageS
+                $memPercent = if ($usedMemoryBytes -and $workingSet -gt 0) {
+                    [System.Math]::Round(($workingSet / $usedMemoryBytes) * 100, 2)
                 } else { "-" }
 
                 # Ensure name fits within 15 characters
@@ -352,9 +350,9 @@ try {
                 # Create a custom object for output
                 [PSCustomObject]@{
                     Name        = $nameFixed
-                    PID         = if ($proc) { $proc.Id } else { "-" }
+                    PID         = $procId
                     CPUPercent  = $normalizedCpu
-                    MemoryMB    = if ($proc) { [System.Math]::Round($workingSet / 1MB, 2) } else { 0 }
+                    MemoryMB    = [System.Math]::Round($workingSet / 1MB, 2)
                     MemPercent  = $memPercent
                     NPM         = $convertNPM
                     StartTime   = $startTime
@@ -403,13 +401,14 @@ try {
 
         # Calculate the total amount of resources being used by the processes
         $totalCpu = ($stats | Measure-Object -Property CPUPercent -Sum).Sum
-        $totalMemory = ($stats | Measure-Object -Property MemoryMB -Sum).Sum
-        $availableMemory = (Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1MB
-        $memoryPerc = $totalMemory / $availableMemory * 1000
+        $totalMemory = [Math]::Round(($OS.TotalVisibleMemorySize - $OS.FreePhysicalMemory) / 1MB, 2)
+        # $totalMemory = ($stats | Measure-Object -Property MemoryMB -Sum).Sum
+        $availableMemory = $OS.TotalVisibleMemorySize / 1MB
+        $memoryPerc = $totalMemory / $availableMemory * 100
         $totalNPM = ($stats | Measure-Object -Property NPM -Sum).Sum
 
         # Create a summary line for total resources used
-        $summaryText = "Total Resource Usage —— CPU Usage%: {0:N2}% | Memory: {1:N1} MB | Memory%: {2:N2} % | NPM: {3:N1} KB" -f $totalCpu, $totalMemory, $memoryPerc, $totalNPM
+        $summaryText = "Total Resource Usage —— CPU Usage%: {0:N2}% | Mem Used: {1:N2}GB | Mem Used%: {2:N2}% | NPM: {3:N1} KB" -f $totalCpu, $totalMemory, $memoryPerc, $totalNPM
         $summaryLine = Format-CenteredText -Text $summaryText -Width $($windowWidth - 1)
         # Add the summary line to the output
         
